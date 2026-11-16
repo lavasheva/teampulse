@@ -10,7 +10,7 @@ export { Participants } from './participants'
 export function Summaries() { return <PageHeader title="Сводки" /> }
 export function Settings() { return <PageHeader title="Настройки проекта" /> }
 export { Team } from './team'
-export function Member() { return <PageHeader title="Участник" /> }
+export { Member } from './member'
 export function Report() { return <main className="p-8"><PageHeader title="Итоговый отчёт" /></main> }
 
 export function NotFound() {

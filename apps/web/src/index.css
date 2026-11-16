@@ -122,3 +122,14 @@
   .invite-popover > summary::-webkit-details-marker { display: none; }
   .invite-popover-content { @apply absolute top-full right-0 z-10 mt-2 w-[min(320px,80vw)] shadow-lg max-sm:right-auto max-sm:left-0; }
 }
+
+@layer components {
+  .member-heatmap { @apply flex gap-2; }
+  .heatmap-labels, .heatmap-days { @apply grid grid-rows-7 gap-1; }
+  .heatmap-labels span { @apply h-4 text-[10px] leading-4 text-muted; }
+  .heatmap-days { @apply grid-flow-col; }
+  .heatmap-days li { @apply size-4 rounded-[3px] bg-[#f0f0fa]; }
+  .heatmap-days li[data-count="1"] { @apply bg-[#c9c3fe]; }
+  .heatmap-days li[data-count="2"] { @apply bg-[#8b80f1]; }
+  .heatmap-days li[data-count="3"] { @apply bg-brand; }
+}

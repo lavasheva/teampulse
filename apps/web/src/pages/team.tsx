@@ -5,14 +5,16 @@ import { ActivityFeed, FlagList } from '../components/team-activity'
 import { UnmatchedCommits } from '../components/unmatched-commits'
 import { Contributions } from '../components/contributions'
 import { healthLabels, teamHealth } from '../data/presentation'
-import { useTeam, useWorkspace } from '../data/workspace'
+import { useDemoMutation, useTeam, useWorkspace } from '../data/workspace'
 import { paths } from '../routes'
+import { confirmCommitAuthor } from '../data/commit-authors'
 
 const ActivityChart = lazy(async () => ({ default: (await import('../components/activity-chart')).ActivityChart }))
 
 export function Team() {
   const { project, team } = useTeam()
   const manager = useWorkspace().data?.user?.role === 'manager'
+  const confirm = useDemoMutation(confirmCommitAuthor)
   const [params, setParams] = useSearchParams()
   if (!project || !team) return <EmptyState title="Команда недоступна"><Link to={paths.projects}>Мои проекты</Link></EmptyState>
 
@@ -38,7 +40,10 @@ export function Team() {
     <div className="detail-grid">
       <div className="space-y-4">
       {tab === 'members' ? <Contributions projectId={project.id} team={team} />
-        : tab === 'events' ? <><UnmatchedCommits events={team.events} /><ActivityFeed projectId={project.id} team={team} /></>
+        : tab === 'events' ? <><UnmatchedCommits events={team.events} action={manager ? undefined : event =>
+            <Button variant="outline" disabled={confirm.isPending} onClick={() => confirm.mutate({ projectId: project.id, teamId: team.id, eventId: event.id })}>Это мой коммит</Button>
+          } />
+          {confirm.isError && <p role="alert">{confirm.error.message}</p>}<ActivityFeed projectId={project.id} team={team} /></>
         : <>
           <Contributions projectId={project.id} team={team} />
           <Suspense fallback={<p role="status">Загружаем график…</p>}><ActivityChart members={team.members} weeks={team.weeks} /></Suspense>

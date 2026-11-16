@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Project, ProjectSettings } from '@teampulse/shared'
 import { Link } from 'react-router'
+import { WorkRules } from '../components/work-rules'
 import { InviteLink } from '../components/invite-link'
 import { Avatar, Badge, Button, EmptyState, PageHeader, Panel } from '../components/ui'
 import { saveProjectSettings } from '../data/settings'
@@ -55,6 +56,7 @@ function SettingsForm({ project }: { project: Project }) {
         </Panel>
         {project.status === 'active' && <Panel title="Приглашение"><InviteLink code={project.inviteCode} /></Panel>}
       </div>
+      <WorkRules settings={settings} update={update} />
     </div>
   </form>
 }

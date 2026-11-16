@@ -1,10 +1,13 @@
+import { lazy, Suspense } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { Badge, Button, EmptyState, PageHeader } from '../components/ui'
-import { ActivityChart } from '../components/activity-chart'
+import { ActivityFeed } from '../components/team-activity'
 import { Contributions } from '../components/contributions'
 import { healthLabels, teamHealth } from '../data/presentation'
 import { useTeam, useWorkspace } from '../data/workspace'
 import { paths } from '../routes'
+
+const ActivityChart = lazy(async () => ({ default: (await import('../components/activity-chart')).ActivityChart }))
 
 export function Team() {
   const { project, team } = useTeam()
@@ -12,7 +15,7 @@ export function Team() {
   const [params, setParams] = useSearchParams()
   if (!project || !team) return <EmptyState title="Команда недоступна"><Link to={paths.projects}>Мои проекты</Link></EmptyState>
 
-  const overview = params.get('tab') !== 'members'
+  const tab = params.get('tab') ?? 'overview'
   const health = healthLabels[teamHealth(team)]
   return <>
     <PageHeader
@@ -25,12 +28,18 @@ export function Team() {
       </>}
     />
     <div className="page-tabs" aria-label="Раздел команды">
-      <button type="button" aria-pressed={overview} onClick={() => setParams({})}>Обзор</button>
-      <button type="button" aria-pressed={!overview} onClick={() => setParams({ tab: 'members' })}>Участники</button>
+      <button type="button" aria-pressed={tab === 'overview'} onClick={() => setParams({})}>Обзор</button>
+      <button type="button" aria-pressed={tab === 'members'} onClick={() => setParams({ tab: 'members' })}>Участники</button>
+      <button type="button" aria-pressed={tab === 'events'} onClick={() => setParams({ tab: 'events' })}>Лента событий</button>
     </div>
     <div className="space-y-4">
-      <Contributions projectId={project.id} team={team} />
-      {overview && <ActivityChart members={team.members} weeks={team.weeks} />}
+      {tab === 'members' ? <Contributions projectId={project.id} team={team} />
+        : tab === 'events' ? <ActivityFeed projectId={project.id} team={team} />
+        : <>
+          <Contributions projectId={project.id} team={team} />
+          <Suspense fallback={<p role="status">Загружаем график…</p>}><ActivityChart members={team.members} weeks={team.weeks} /></Suspense>
+          <ActivityFeed projectId={project.id} team={team} limit={4} />
+        </>}
     </div>
   </>
 }

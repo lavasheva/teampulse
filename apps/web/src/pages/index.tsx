@@ -8,7 +8,7 @@ export { Projects } from './projects'
 export { Overview } from './overview'
 export { Participants } from './participants'
 export { Summaries } from './summaries'
-export function Settings() { return <PageHeader title="Настройки проекта" /> }
+export { Settings } from './settings'
 export { Team } from './team'
 export { Member } from './member'
 export function Report() { return <main className="p-8"><PageHeader title="Итоговый отчёт" /></main> }

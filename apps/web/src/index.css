@@ -133,3 +133,12 @@
   .heatmap-days li[data-count="2"] { @apply bg-[#8b80f1]; }
   .heatmap-days li[data-count="3"] { @apply bg-brand; }
 }
+
+@layer components {
+  .report-screen { @apply min-h-dvh bg-[#e7e9ee] px-4 py-5 sm:px-8 sm:py-10; }
+  .report-toolbar { @apply mx-auto mb-4 flex max-w-[880px] flex-wrap items-center justify-between gap-3 text-xs; }
+  .report-sheet { @apply mx-auto max-w-[880px] rounded-sm bg-white p-6 sm:p-12 lg:p-16; }
+  .report-section { @apply mb-5; }
+  .report-section > h2 { @apply border-b border-line pb-2 text-base; }
+  .report-member { @apply grid gap-3 py-3 sm:grid-cols-[minmax(130px,1fr)_2.5fr] sm:gap-5; }
+}

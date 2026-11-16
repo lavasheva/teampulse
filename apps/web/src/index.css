@@ -101,3 +101,8 @@
   .project-new > span { @apply text-2xl; }
   .project-new small { @apply font-normal text-muted; }
 }
+
+@layer components {
+  .project-dialog { @apply m-auto w-[calc(100%-2rem)] max-w-lg rounded-xl border border-line bg-white p-6 text-ink shadow-xl; }
+  .project-dialog::backdrop { @apply bg-ink/35; }
+}

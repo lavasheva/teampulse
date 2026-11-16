@@ -2,8 +2,10 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { WorkspaceLayout } from './components/layout'
 import { Invite, Login, Member, NotFound, Overview, Participants, Projects, Report, Settings, Summaries, Team } from './pages'
 import { paths } from './routes'
+import { useWorkspaceStorageEvents } from './data/workspace'
 
 export default function App() {
+  useWorkspaceStorageEvents()
   return (
     <BrowserRouter>
       <Routes>

@@ -4,6 +4,7 @@ import { Badge, Button, Card, EmptyState, Meter, PageHeader } from '../component
 import { formatDate, formatNumber, teamHealth } from '../data/presentation'
 import { useWorkspace } from '../data/workspace'
 import { paths } from '../routes'
+import { ProjectCreate } from './project-create'
 
 const filters = [
   { value: 'all', label: 'Все' },
@@ -53,6 +54,7 @@ export function Projects() {
       {manager && filter !== 'complete' && <button className="project-new" type="button" onClick={() => setParams({ new: '1' })}><span aria-hidden="true">+</span>Новый проект<small>Курс, поток, стажировка или хакатон</small></button>}
     </div>
     {!visible.length && <div className="mt-4"><EmptyState title="Пока нет проектов">{!manager && <Link to={paths.exampleInvite}>Открыть приглашение</Link>}</EmptyState></div>}
+    {params.has('new') && manager && <ProjectCreate onDismiss={() => setParams({})} />}
     {params.has('new') && !manager && <p role="alert" className="mt-4">Создавать проекты может преподаватель.</p>}
   </>
 }

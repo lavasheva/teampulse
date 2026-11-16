@@ -4,7 +4,7 @@ import { paths } from '../routes'
 
 export { Login } from './login'
 export { Invite } from './invite'
-export function Projects() { return <><PageHeader title="Мои проекты" /><Link to={paths.project('web')}>Веб-разработка, осень 2026</Link></> }
+export { Projects } from './projects'
 export function Overview() { return <PageHeader title="Обзор проекта" /> }
 export function Participants() { return <PageHeader title="Участники" /> }
 export function Summaries() { return <PageHeader title="Сводки" /> }

@@ -88,3 +88,16 @@
   .login-note { @apply space-y-4 border-t border-line pt-4; }
   .login-note p { @apply text-xs; }
 }
+
+@layer components {
+  .tabs { @apply flex flex-wrap items-center gap-2; }
+  .tabs > button { @apply cursor-pointer rounded-full border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink hover:border-brand; }
+  .tabs > button[aria-pressed=true] { @apply border-ink bg-ink text-white; }
+  .project-card { @apply p-4 transition-colors hover:border-brand; }
+  .project-card dt { @apply text-muted; }
+  .project-card dd { @apply text-2xl font-bold; }
+  .project-health { @apply mt-4 rounded-lg px-3 py-2 text-xs font-medium; }
+  .project-new { @apply flex min-h-54 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-[#d0cbfa] p-4 font-medium text-brand hover:bg-[#eeecff]; }
+  .project-new > span { @apply text-2xl; }
+  .project-new small { @apply font-normal text-muted; }
+}

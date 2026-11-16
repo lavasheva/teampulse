@@ -1,13 +1,16 @@
 import { Link, useSearchParams } from 'react-router'
 import { Badge, Button, EmptyState, PageHeader, Panel } from '../components/ui'
 import { formatDate, healthLabels, teamHealth, teamsByHealth } from '../data/presentation'
-import { useProject, useWorkspace } from '../data/workspace'
+import { refreshSummary, updateSummaryMailing } from '../data/summaries'
+import { useDemoMutation, useProject, useWorkspace } from '../data/workspace'
 import { paths } from '../routes'
 
 export function Summaries() {
   const project = useProject()
   const manager = useWorkspace().data?.user?.role === 'manager'
   const [params, setParams] = useSearchParams()
+  const refresh = useDemoMutation(refreshSummary)
+  const mailing = useDemoMutation(updateSummaryMailing)
   if (!project) return <EmptyState title="Проект недоступен"><Link to={paths.projects}>Мои проекты</Link></EmptyState>
 
   const teamId = params.get('team')
@@ -18,7 +21,11 @@ export function Summaries() {
 
   return <>
     <PageHeader title="Сводки" eyebrow={project.settings.name} description={filteredTeam ? 'Команда «' + filteredTeam.name + '»' : 'Еженедельные сводки по проекту и командам'}
-      actions={manager && <Button asChild variant="outline"><a href="#mailing">Настроить рассылку</a></Button>} />
+      actions={manager && <>
+        <Button asChild variant="outline"><a href="#mailing">Настроить рассылку</a></Button>
+        <Button disabled={!summary || !latest || refresh.isPending} onClick={() => refresh.mutate(project.id)}>Обновить сводку</Button>
+      </>} />
+    {refresh.isError && <p className="mb-4" role="alert">{refresh.error.message}</p>}
     {project.summaries.length > 0 && <div className="tabs mb-5" aria-label="Неделя сводки">
       {project.summaries.map(item => <button key={item.id} type="button" aria-pressed={summary?.id === item.id} onClick={() => {
         setParams(current => {
@@ -53,6 +60,12 @@ export function Summaries() {
         </dl></Panel>}
         {manager && <div id="mailing" className="scroll-mt-5"><Panel title="Рассылка">
           <p className="text-xs muted">По понедельникам в 9:00 · {project.sendTeamSummaries ? 'преподавателю и командам' : 'преподавателю'}</p>
+          <label className="mt-4 flex items-center justify-between gap-3 text-xs">
+            Отправлять командам их сводку
+            <input type="checkbox" role="switch" checked={project.sendTeamSummaries} disabled={mailing.isPending}
+              onChange={event => mailing.mutate({ projectId: project.id, enabled: event.currentTarget.checked })} />
+          </label>
+          {mailing.isError && <p role="alert" className="mt-2 text-xs">{mailing.error.message}</p>}
         </Panel></div>}
       </aside>
     </div>

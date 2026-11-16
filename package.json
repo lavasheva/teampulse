@@ -8,6 +8,8 @@
   "scripts": {
     "dev": "pnpm --filter @teampulse/web dev",
     "lint": "pnpm --filter @teampulse/web lint",
-    "build": "pnpm --filter @teampulse/web build"
+    "build": "pnpm --filter @teampulse/web build",
+    "test": "pnpm --filter @teampulse/web test",
+    "test:e2e": "pnpm --filter @teampulse/web test:e2e"
   }
 }

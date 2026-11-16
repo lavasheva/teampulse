@@ -62,7 +62,7 @@ export function Summaries() {
           <p className="text-xs muted">По понедельникам в 9:00 · {project.sendTeamSummaries ? 'преподавателю и командам' : 'преподавателю'}</p>
           <label className="mt-4 flex items-center justify-between gap-3 text-xs">
             Отправлять командам их сводку
-            <input type="checkbox" role="switch" checked={project.sendTeamSummaries} disabled={mailing.isPending}
+            <input type="checkbox" role="switch" checked={mailing.isPending ? mailing.variables.enabled : project.sendTeamSummaries} disabled={mailing.isPending}
               onChange={event => mailing.mutate({ projectId: project.id, enabled: event.currentTarget.checked })} />
           </label>
           {mailing.isError && <p role="alert" className="mt-2 text-xs">{mailing.error.message}</p>}

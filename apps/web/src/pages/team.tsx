@@ -35,6 +35,7 @@ export function Team() {
     <div className="page-tabs" aria-label="Раздел команды">
       <button type="button" aria-pressed={tab === 'overview'} onClick={() => setParams({})}>Обзор</button>
       <button type="button" aria-pressed={tab === 'members'} onClick={() => setParams({ tab: 'members' })}>Участники</button>
+      <Link to={paths.summaries(project.id) + '?team=' + encodeURIComponent(team.id)}>Сводки</Link>
       <button type="button" aria-pressed={tab === 'events'} onClick={() => setParams({ tab: 'events' })}>Лента событий</button>
     </div>
     <div className="detail-grid">

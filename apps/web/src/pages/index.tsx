@@ -3,7 +3,7 @@ import { EmptyState, PageHeader } from '../components/ui'
 import { paths } from '../routes'
 
 export { Login } from './login'
-export function Invite() { return <main className="p-8"><PageHeader title="Приглашение в проект" /></main> }
+export { Invite } from './invite'
 export function Projects() { return <><PageHeader title="Мои проекты" /><Link to={paths.project('web')}>Веб-разработка, осень 2026</Link></> }
 export function Overview() { return <PageHeader title="Обзор проекта" /> }
 export function Participants() { return <PageHeader title="Участники" /> }

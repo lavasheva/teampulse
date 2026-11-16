@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { Badge, Button, EmptyState, PageHeader, Panel } from '../components/ui'
 import { ActivityFeed, FlagList } from '../components/team-activity'
+import { UnmatchedCommits } from '../components/unmatched-commits'
 import { Contributions } from '../components/contributions'
 import { healthLabels, teamHealth } from '../data/presentation'
 import { useTeam, useWorkspace } from '../data/workspace'
@@ -37,7 +38,7 @@ export function Team() {
     <div className="detail-grid">
       <div className="space-y-4">
       {tab === 'members' ? <Contributions projectId={project.id} team={team} />
-        : tab === 'events' ? <ActivityFeed projectId={project.id} team={team} />
+        : tab === 'events' ? <><UnmatchedCommits events={team.events} /><ActivityFeed projectId={project.id} team={team} /></>
         : <>
           <Contributions projectId={project.id} team={team} />
           <Suspense fallback={<p role="status">Загружаем график…</p>}><ActivityChart members={team.members} weeks={team.weeks} /></Suspense>

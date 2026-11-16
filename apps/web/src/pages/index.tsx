@@ -9,7 +9,7 @@ export function Overview() { return <PageHeader title="Обзор проекта
 export function Participants() { return <PageHeader title="Участники" /> }
 export function Summaries() { return <PageHeader title="Сводки" /> }
 export function Settings() { return <PageHeader title="Настройки проекта" /> }
-export function Team() { return <PageHeader title="Команда" /> }
+export { Team } from './team'
 export function Member() { return <PageHeader title="Участник" /> }
 export function Report() { return <main className="p-8"><PageHeader title="Итоговый отчёт" /></main> }
 

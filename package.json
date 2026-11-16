@@ -1,0 +1,13 @@
+{
+  "name": "teampulse",
+  "private": true,
+  "packageManager": "pnpm@10.17.1",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @teampulse/web dev",
+    "lint": "pnpm --filter @teampulse/web lint",
+    "build": "pnpm --filter @teampulse/web build"
+  }
+}

@@ -1,1 +1,62 @@
+@import "@fontsource-variable/inter";
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter Variable", Inter, system-ui, sans-serif;
+  --color-brand: #5141dd;
+  --color-ink: #131827;
+  --color-muted: #666c79;
+  --color-line: #e6e8ef;
+  --color-canvas: #f5f6f8;
+}
+
+@layer base {
+  body { @apply m-0 bg-canvas font-sans text-sm text-ink antialiased; }
+  h1 { @apply text-[28px] leading-tight font-bold tracking-tight; }
+  h2 { @apply text-sm font-semibold; }
+  a { @apply text-brand; }
+  a:hover { text-decoration: underline; }
+  :focus-visible { outline: 2px solid var(--color-brand); outline-offset: 3px; }
+  label { @apply text-sm font-medium; }
+  input:not([type=checkbox], [type=radio], [type=range]), select, textarea {
+    @apply w-full rounded-lg border border-line bg-white px-3 py-2 text-ink;
+  }
+  input[type=checkbox], input[type=radio], input[type=range] { accent-color: var(--color-brand); }
+  table { @apply w-full border-collapse text-left; }
+  th { @apply text-xs font-medium text-muted; }
+  th, td { @apply border-b border-line px-3 py-3; }
+  tr:last-child td { border-bottom: 0; }
+}
+
+@layer components {
+  .button { @apply inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium leading-tight no-underline transition-colors hover:no-underline disabled:cursor-not-allowed disabled:opacity-50; }
+  .button-primary { @apply border-brand bg-brand text-white hover:bg-[#4031c6]; }
+  .button-outline { @apply border-line bg-white text-ink hover:bg-canvas; }
+  .button-dark { @apply border-ink bg-ink text-white hover:bg-[#292e3b]; }
+  .button-ghost { @apply border-transparent bg-transparent text-brand hover:bg-[#eeecff]; }
+  .card { @apply min-w-0 rounded-xl border border-line bg-white p-5; }
+  .panel-heading { @apply mb-4 flex items-center justify-between gap-3; }
+  .page-heading { @apply mb-5 flex flex-wrap items-end justify-between gap-4; }
+  .page-heading p { @apply mt-1 text-sm text-muted; }
+  .eyebrow { @apply mb-1 text-xs text-muted; }
+  .actions { @apply flex flex-wrap items-center gap-2; }
+  .brand { @apply inline-flex items-center gap-2.5 font-bold text-ink; }
+  .brand > span { @apply grid size-8 place-items-center rounded-lg bg-brand text-sm text-white; }
+  .brand-inverse { @apply text-white; }
+  .brand-inverse > span { @apply bg-white text-brand; }
+  .avatar { @apply inline-grid size-8 shrink-0 place-items-center rounded-full text-xs font-semibold text-white; }
+  .badge { @apply inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap; }
+  .badge-neutral { @apply bg-canvas text-muted; }
+  .badge-primary { @apply bg-[#efedff] text-brand; }
+  .badge-success { @apply bg-[#eaf8ef] text-[#20633b]; }
+  .badge-warning { @apply bg-[#fff4dc] text-[#815213]; }
+  .badge-danger { @apply bg-[#fdecea] text-[#9b3b34]; }
+  .empty-state { @apply space-y-3 px-5 py-10 text-center text-muted; }
+  .empty-state h2 { @apply text-ink; }
+  .meter { @apply block h-1.5 overflow-hidden rounded-full bg-line; }
+  .meter > span { @apply block h-full rounded-full bg-brand; }
+  .field { @apply grid gap-1.5; }
+  .muted { @apply text-muted; }
+  .table-scroll { @apply overflow-x-auto; }
+  .text-link { @apply cursor-pointer text-sm font-medium text-brand hover:underline; }
+}

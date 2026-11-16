@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { Badge, Button, EmptyState, PageHeader } from '../components/ui'
-import { ActivityFeed } from '../components/team-activity'
+import { Badge, Button, EmptyState, PageHeader, Panel } from '../components/ui'
+import { ActivityFeed, FlagList } from '../components/team-activity'
 import { Contributions } from '../components/contributions'
 import { healthLabels, teamHealth } from '../data/presentation'
 import { useTeam, useWorkspace } from '../data/workspace'
@@ -17,6 +17,8 @@ export function Team() {
 
   const tab = params.get('tab') ?? 'overview'
   const health = healthLabels[teamHealth(team)]
+  const weekly = project.summaries[0]
+  const excluded = team.members.flatMap(member => member.exclusions).reduce((total, item) => total + item.lines, 0)
   return <>
     <PageHeader
       eyebrow={<Link to={manager ? paths.project(project.id) : paths.projects}>← {project.settings.name}</Link>}
@@ -32,7 +34,8 @@ export function Team() {
       <button type="button" aria-pressed={tab === 'members'} onClick={() => setParams({ tab: 'members' })}>Участники</button>
       <button type="button" aria-pressed={tab === 'events'} onClick={() => setParams({ tab: 'events' })}>Лента событий</button>
     </div>
-    <div className="space-y-4">
+    <div className="detail-grid">
+      <div className="space-y-4">
       {tab === 'members' ? <Contributions projectId={project.id} team={team} />
         : tab === 'events' ? <ActivityFeed projectId={project.id} team={team} />
         : <>
@@ -40,6 +43,15 @@ export function Team() {
           <Suspense fallback={<p role="status">Загружаем график…</p>}><ActivityChart members={team.members} weeks={team.weeks} /></Suspense>
           <ActivityFeed projectId={project.id} team={team} limit={4} />
         </>}
+      </div>
+      <aside className="space-y-4">
+        <FlagList flags={team.flags} />
+        {weekly?.teamTexts[team.id] && <Panel title="Сводка за неделю" aside={<Badge tone="primary">{weekly.label}</Badge>}>
+          <p className="text-sm muted">{weekly.teamTexts[team.id]}</p>
+          <Link className="mt-3 inline-block text-xs" to={paths.summaries(project.id) + '?team=' + encodeURIComponent(team.id)}>Все сводки →</Link>
+        </Panel>}
+        <Panel title="Защита от накрутки"><p className="text-sm muted">Строк исключено из вклада: {excluded.toLocaleString('ru-RU')}. Подробности в карточках участников.</p></Panel>
+      </aside>
     </div>
   </>
 }

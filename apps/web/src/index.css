@@ -60,3 +60,16 @@
   .table-scroll { @apply overflow-x-auto; }
   .text-link { @apply cursor-pointer text-sm font-medium text-brand hover:underline; }
 }
+
+@layer components {
+  .workspace { @apply grid min-h-dvh grid-cols-[240px_minmax(0,1fr)] max-md:block; }
+  .sidebar { @apply sticky top-0 flex h-dvh flex-col border-r border-line bg-white px-3.5 py-4 max-md:static max-md:h-auto max-md:border-r-0 max-md:border-b; }
+  .sidebar-brand { @apply px-3 py-2 no-underline hover:no-underline; }
+  .sidebar-nav { @apply mt-3 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto max-md:flex-row max-md:flex-wrap; }
+  .sidebar-nav p { @apply mt-3 mb-1 px-3 text-[11px] font-medium text-muted uppercase max-md:hidden; }
+  .sidebar-nav a, .sidebar-nav button { @apply block w-full rounded-md px-3 py-2 text-left text-sm text-muted hover:bg-canvas hover:text-ink hover:no-underline max-md:w-auto; }
+  .sidebar-nav a[aria-current=page], .sidebar-nav .nav-current { @apply bg-[#efedff] font-semibold text-brand; }
+  .sidebar-profile { @apply mt-auto flex items-center gap-2 border-t border-line px-3 pt-3 text-xs max-md:mt-3; }
+  .sidebar-profile small { @apply block text-muted; }
+  .workspace-content { @apply w-full min-w-0 p-8 max-md:p-4; }
+}

@@ -114,3 +114,11 @@
   .detail-grid { @apply grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(275px,1fr)]; }
   .detail-grid > * { @apply min-w-0; }
 }
+
+@layer components {
+  .team-card { @apply flex flex-col p-4 transition-colors hover:border-brand; }
+  .invite-popover { @apply relative; }
+  .invite-popover > summary { list-style: none; }
+  .invite-popover > summary::-webkit-details-marker { display: none; }
+  .invite-popover-content { @apply absolute top-full right-0 z-10 mt-2 w-[min(320px,80vw)] shadow-lg max-sm:right-auto max-sm:left-0; }
+}

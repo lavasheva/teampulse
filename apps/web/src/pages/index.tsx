@@ -5,7 +5,7 @@ import { paths } from '../routes'
 export { Login } from './login'
 export { Invite } from './invite'
 export { Projects } from './projects'
-export function Overview() { return <PageHeader title="Обзор проекта" /> }
+export { Overview } from './overview'
 export function Participants() { return <PageHeader title="Участники" /> }
 export function Summaries() { return <PageHeader title="Сводки" /> }
 export function Settings() { return <PageHeader title="Настройки проекта" /> }

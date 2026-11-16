@@ -1,5 +1,6 @@
 import { Link, useSearchParams } from 'react-router'
 import { Badge, Button, EmptyState, PageHeader } from '../components/ui'
+import { ActivityChart } from '../components/activity-chart'
 import { Contributions } from '../components/contributions'
 import { healthLabels, teamHealth } from '../data/presentation'
 import { useTeam, useWorkspace } from '../data/workspace'
@@ -27,6 +28,9 @@ export function Team() {
       <button type="button" aria-pressed={overview} onClick={() => setParams({})}>Обзор</button>
       <button type="button" aria-pressed={!overview} onClick={() => setParams({ tab: 'members' })}>Участники</button>
     </div>
-    <Contributions projectId={project.id} team={team} />
+    <div className="space-y-4">
+      <Contributions projectId={project.id} team={team} />
+      {overview && <ActivityChart members={team.members} weeks={team.weeks} />}
+    </div>
   </>
 }

@@ -29,6 +29,10 @@ export function Report() {
   return <main className="report-screen">
     <div className="report-toolbar">
       <Link to={paths.team(project.id, team.id)}>← {team.name} / Итоговый отчёт</Link>
+      <div className="actions">
+        <Button variant="outline" onClick={() => window.print()}>Сохранить как PDF</Button>
+        <Button onClick={() => window.print()}>Печать</Button>
+      </div>
     </div>
     <article className="report-sheet">
       <header className="mb-6">

@@ -1,8 +1,8 @@
 import { Link, Navigate } from 'react-router'
 import { InviteLink } from '../components/invite-link'
-import { ProjectTeamCard, teamsByHealth } from '../components/project-team-card'
+import { ProjectTeamCard } from '../components/project-team-card'
 import { Badge, Button, Card, EmptyState, PageHeader, Panel } from '../components/ui'
-import { formatDate, formatNumber, teamHealth } from '../data/presentation'
+import { formatDate, formatNumber, teamHealth, teamsByHealth } from '../data/presentation'
 import { useProject, useWorkspace } from '../data/workspace'
 import { paths } from '../routes'
 

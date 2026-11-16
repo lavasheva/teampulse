@@ -4,12 +4,6 @@ import { formatDay, formatNumber, healthLabels, teamHealth } from '../data/prese
 import { paths } from '../routes'
 import { Badge, Card } from './ui'
 
-const rank = { risk: 0, warning: 1, normal: 2 }
-
-export function teamsByHealth(teams: Team[]) {
-  return [...teams].sort((a, b) => rank[teamHealth(a)] - rank[teamHealth(b)])
-}
-
 export function ProjectTeamCard({ projectId, team }: { projectId: string; team: Team }) {
   const health = healthLabels[teamHealth(team)]
   const flags = team.flags.filter(flag => !flag.resolved)

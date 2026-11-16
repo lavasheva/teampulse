@@ -17,3 +17,9 @@ export function teamHealth(team: Team) {
   if (flags.some(flag => flag.severity === 'risk')) return 'risk'
   return flags.length ? 'warning' : 'normal'
 }
+
+const rank = { risk: 0, warning: 1, normal: 2 }
+
+export function teamsByHealth(teams: Team[]) {
+  return [...teams].sort((a, b) => rank[teamHealth(a)] - rank[teamHealth(b)])
+}

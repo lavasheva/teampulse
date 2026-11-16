@@ -6,7 +6,7 @@ export { Login } from './login'
 export { Invite } from './invite'
 export { Projects } from './projects'
 export { Overview } from './overview'
-export function Participants() { return <PageHeader title="Участники" /> }
+export { Participants } from './participants'
 export function Summaries() { return <PageHeader title="Сводки" /> }
 export function Settings() { return <PageHeader title="Настройки проекта" /> }
 export { Team } from './team'

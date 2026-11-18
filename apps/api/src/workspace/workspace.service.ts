@@ -40,7 +40,7 @@ export class WorkspaceService {
     if (!membership) throw new NotFoundException('Organization not found')
     return this.prisma.project.create({ data: { organizationId, name: input.name,
       startsOn: new Date(input.startsOn), endsOn: new Date(input.endsOn),
-      weights: { code: 1, pullRequests: 1, reviews: 1, issues: 1 },
+      weights: { code: 25, pullRequests: 25, reviews: 25, issues: 25 },
       thresholds: { inactivity: 7, imbalance: 60, lateBurst: 50, excluded: 50 },
       managers: { create: { userId } }, teams: { create: { name: input.teamName } } },
       select: { id: true, name: true, startsOn: true, endsOn: true, teams: { select: { id: true, name: true } } } })

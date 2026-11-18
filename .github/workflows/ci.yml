@@ -1,0 +1,60 @@
+name: CI
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: teampulse_test
+          POSTGRES_USER: teampulse
+          POSTGRES_PASSWORD: teampulse
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U teampulse -d teampulse_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://teampulse:teampulse@localhost:5432/teampulse_test?schema=public
+      TEST_DATABASE_URL: postgresql://teampulse:teampulse@localhost:5432/teampulse_test?schema=public
+      REDIS_URL: redis://127.0.0.1:6379
+      GITHUB_EVENTS_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.17.1
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @teampulse/api db:generate
+      - run: pnpm --filter @teampulse/api db:deploy
+      - run: pnpm --filter @teampulse/api db:validate
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm test
+      - run: pnpm --filter @teampulse/api test:integration
+      - run: pnpm --filter @teampulse/api test:smoke
+      - run: pnpm --filter @teampulse/web exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - run: pnpm test:e2e:api

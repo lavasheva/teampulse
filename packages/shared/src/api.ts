@@ -59,3 +59,23 @@ export interface CollectedEventResponse {
   author: { id: string; userId: string | null; login: string | null; resolution: string } | null
 }
 export interface CollectedEventsResponse { events: CollectedEventResponse[]; nextCursor: string | null }
+
+export interface LiveProjectSettings {
+  name: string; startsOn: string; endsOn: string
+  weights: Record<'code' | 'pullRequests' | 'reviews' | 'issues', number>
+  thresholds: { inactivity: number; imbalance: number; lateBurst: number; excluded: number }
+  milestones: { id: string; title: string; date: string }[]
+}
+export interface LiveProject {
+  id: string; organization: OrganizationResponse; canManage: boolean; settings: LiveProjectSettings
+  teams: { id: string; name: string; canConnect: boolean
+    memberships: { role: 'participant' | 'observer'; user: ApiUser }[]
+    repository: { fullName: string; syncStatus: RepositorySyncStatus; _count: { events: number } } | null }[]
+  analytics: { status: 'not_configured' }
+}
+export interface LiveWorkspaceResponse { organizations: OrganizationListItem[]; projects: LiveProject[] }
+export interface MemberActivityResponse {
+  role: 'participant' | 'observer'; user: ApiUser
+  rawActivity: { kind: CollectedEventResponse['kind']; count: number }[]
+  analytics: { status: 'not_configured' }
+}

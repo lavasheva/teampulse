@@ -26,6 +26,20 @@ export class GitHubAppClient {
     }) })
     return app.getInstallationOctokit(Number(installationId))
   }
+
+  async findInstallation(fullName: string) {
+    const appId = process.env.GITHUB_APP_ID, path = process.env.GITHUB_APP_PRIVATE_KEY_PATH
+    if (!appId || !path) throw new ServiceUnavailableException('GitHub App is not configured')
+    try {
+      const { App, Octokit } = await import('octokit')
+      const app = new App({ appId, privateKey: await readFile(path, 'utf8'), Octokit: Octokit.defaults({
+        log: { debug() {}, info() {}, warn() {}, error() {} }, request: { timeout: 10000 },
+      }) })
+      const [owner, repo] = fullName.split('/')
+      const installation = await app.octokit.request('GET /repos/{owner}/{repo}/installation', { owner, repo })
+      return String(installation.data.id)
+    } catch { throw new ServiceUnavailableException('Install the GitHub App on this repository first') }
+  }
   async verifyRepository(installationId: string, fullName: string, githubId: string) {
     const appId = process.env.GITHUB_APP_ID, path = process.env.GITHUB_APP_PRIVATE_KEY_PATH
     if (!appId || !path) throw new ServiceUnavailableException('GitHub App is not configured')

@@ -12,6 +12,7 @@
     "lint": "pnpm -r --if-present lint",
     "build": "pnpm -r --if-present build",
     "test": "pnpm -r --if-present test",
-    "test:e2e": "pnpm --filter @teampulse/web test:e2e"
+    "test:e2e": "pnpm --filter @teampulse/web test:e2e",
+    "test:e2e:api": "pnpm --filter @teampulse/api build && pnpm --filter @teampulse/web test:e2e:api"
   }
 }

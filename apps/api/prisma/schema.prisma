@@ -1,0 +1,237 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrgRole {
+  owner
+  manager
+}
+
+enum TeamRole {
+  participant
+  observer
+}
+
+enum Provider {
+  github
+}
+
+enum SyncStatus {
+  pending
+  running
+  complete
+  failed
+  disconnected
+}
+
+enum DeliveryStatus {
+  pending
+  processing
+  complete
+  failed
+}
+
+enum EventKind {
+  commit
+  pr_opened
+  pr_merged
+  pr_closed
+  review
+  issue_opened
+  issue_closed
+}
+
+model User {
+  id              String           @id @default(uuid()) @db.Uuid
+  githubId        String           @unique
+  githubLogin     String
+  name            String?
+  email           String?
+  avatarUrl       String?
+  createdAt       DateTime         @default(now())
+  organizations   OrgMembership[]
+  managedProjects ProjectManager[]
+  teams           TeamMembership[]
+  identities      GitIdentity[]
+  sessions        Session[]
+}
+
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  tokenHash String   @unique
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@index([userId])
+}
+
+model Organization {
+  id          String          @id @default(uuid()) @db.Uuid
+  name        String
+  kind        String
+  createdAt   DateTime        @default(now())
+  memberships OrgMembership[]
+  projects    Project[]
+}
+
+model OrgMembership {
+  organizationId String       @db.Uuid
+  userId         String       @db.Uuid
+  role           OrgRole
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, userId])
+  @@index([userId])
+}
+
+model Project {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  startsOn       DateTime         @db.Date
+  endsOn         DateTime         @db.Date
+  weights        Json
+  thresholds     Json
+  createdAt      DateTime         @default(now())
+  managers       ProjectManager[]
+  teams          Team[]
+  milestones     Milestone[]
+  invitations    Invitation[]
+
+  @@index([organizationId])
+}
+
+// Руководитель видит свои проекты, а не все проекты организации.
+model ProjectManager {
+  projectId String  @db.Uuid
+  userId    String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+  @@index([userId])
+}
+
+model Milestone {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @db.Uuid
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String
+  date      DateTime @db.Date
+
+  @@index([projectId])
+}
+
+// В БД хранится хеш приглашения; открытый токен существует только в ссылке.
+model Invitation {
+  id        String    @id @default(uuid()) @db.Uuid
+  tokenHash String    @unique
+  projectId String    @db.Uuid
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([projectId])
+}
+
+model Team {
+  id          String           @id @default(uuid()) @db.Uuid
+  projectId   String           @db.Uuid
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  createdAt   DateTime         @default(now())
+  memberships TeamMembership[]
+  repository  Repository?
+
+  @@index([projectId])
+}
+
+model TeamMembership {
+  teamId   String   @db.Uuid
+  userId   String   @db.Uuid
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     TeamRole @default(participant)
+  joinedAt DateTime @default(now())
+
+  @@id([teamId, userId])
+  @@index([userId])
+}
+
+model Repository {
+  id             String            @id @default(uuid()) @db.Uuid
+  teamId         String            @unique @db.Uuid
+  team           Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  provider       Provider          @default(github)
+  externalId     String
+  fullName       String
+  installationId String
+  syncStatus     SyncStatus        @default(pending)
+  syncCursor     String?
+  syncedAt       DateTime?
+  identities     GitIdentity[]
+  events         Event[]
+  deliveries     WebhookDelivery[]
+
+  @@unique([provider, externalId])
+}
+
+model GitIdentity {
+  id           String     @id @default(uuid()) @db.Uuid
+  repositoryId String     @db.Uuid
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  provider     Provider   @default(github)
+  // Стабильный ключ: github:<id> либо email:<нормализованный email>.
+  authorKey    String
+  login        String?
+  email        String?
+  userId       String?    @db.Uuid
+  user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  events       Event[]
+
+  @@unique([repositoryId, provider, authorKey])
+  @@index([userId])
+}
+
+// Неизменяемые нормализованные события; содержимое кода не сохраняется.
+model Event {
+  id           String       @id @default(uuid()) @db.Uuid
+  repositoryId String       @db.Uuid
+  repository   Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  externalId   String
+  kind         EventKind
+  authorId     String?      @db.Uuid
+  author       GitIdentity? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  occurredAt   DateTime
+  payload      Json
+  createdAt    DateTime     @default(now())
+
+  @@unique([repositoryId, externalId])
+  @@index([repositoryId, occurredAt])
+  @@index([authorId])
+}
+
+model WebhookDelivery {
+  id           String         @id
+  repositoryId String?        @db.Uuid
+  repository   Repository?    @relation(fields: [repositoryId], references: [id], onDelete: SetNull)
+  eventName    String
+  status       DeliveryStatus @default(pending)
+  receivedAt   DateTime       @default(now())
+  processedAt  DateTime?
+  attempts     Int            @default(0)
+
+  @@index([status, receivedAt])
+  @@index([repositoryId])
+}

@@ -7,9 +7,11 @@
   },
   "scripts": {
     "dev": "pnpm --filter @teampulse/web dev",
-    "lint": "pnpm --filter @teampulse/web lint",
-    "build": "pnpm --filter @teampulse/web build",
-    "test": "pnpm --filter @teampulse/web test",
+    "dev:api": "pnpm --filter @teampulse/api dev",
+    "start:api": "pnpm --filter @teampulse/api start",
+    "lint": "pnpm -r --if-present lint",
+    "build": "pnpm -r --if-present build",
+    "test": "pnpm -r --if-present test",
     "test:e2e": "pnpm --filter @teampulse/web test:e2e"
   }
 }

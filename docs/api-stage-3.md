@@ -1,6 +1,6 @@
 # Этап 3: GitHub App и конвейер событий
 
-Проверено 18.11.2026 на Node.js 24.22.3: lint и build всего проекта, 31 тест API, 2 теста клиента, 17 интеграционных тестов с PostgreSQL/Redis и HTTP smoke с настоящей БД. Миграция применена к БД разработки и тестовой БД; Prisma diff без расхождений. Настоящий GitHub App пока не зарегистрирован и не проверен.
+Проверено 18.11.2026 на Node.js 24.22.3: lint и build всего проекта, 31 тест API, 2 теста клиента, 17 интеграционных тестов с PostgreSQL/Redis и HTTP smoke с настоящей БД. Миграция применена к БД разработки и тестовой БД; Prisma diff без расхождений. Настоящий TeamPulse Insights установлен на lavasheva/teampulse; read-only права и проверка admin-доступа lavasheva подтверждены через GitHub API. Репозиторий связан с локальным тестовым проектом; PostgreSQL и Redis готовы.
 
 Ветка: `backend/stage-3-github-events`, база — `develop` после PR №15.
 
@@ -67,6 +67,6 @@ Worker одной транзакцией сохраняет авторов/со�
 
 Интеграционные тесты проверяют подпись по байтам, лимит тела, дубли и конфликт ID, rollback/повторы, отключение источника, доступ к подключению и обработку в настоящем BullMQ. Недоступность транспорта Redis моделируется сбоем dispatcher, затем обработка восстанавливается настоящим Redis. GitHub App API в тестах подменён.
 
-Ручная установка настоящего GitHub App, проверка его read-only прав и доставка события от GitHub пока требуют настройки App и публичного webhook URL. История/пагинация коммитов, обогащение diff-статистики, суточная сверка и полное сопоставление авторов относятся к этапу 4. Фронтенд остаётся на демоданных.
+Для ручной проверки настроен настоящий GitHub App с временным HTTPS-туннелем Pinggy, который открывает только POST /api/webhooks/github. Установка и read-only права проверены; контрольный push используется для проверки всего конвейера. История/пагинация коммитов, обогащение diff-статистики, суточная сверка и полное сопоставление авторов относятся к этапу 4. Фронтенд остаётся на демоданных.
 
 Источники: [подписи GitHub](https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries), [события и payload](https://docs.github.com/en/webhooks/webhook-events-and-payloads), [повторы BullMQ](https://docs.bullmq.io/guide/retrying-failing-jobs), [проверка администраторов репозитория](https://docs.github.com/en/rest/collaborators/collaborators#list-repository-collaborators).

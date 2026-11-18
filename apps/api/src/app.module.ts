@@ -9,11 +9,16 @@ import { GitHubClient } from './auth/github.client'
 import { SessionGuard } from './auth/session.guard'
 import { WorkspaceController } from './workspace/workspace.controller'
 import { WorkspaceService } from './workspace/workspace.service'
+import { WebhooksController } from './github/webhooks.controller'
+import { RepositoriesController } from './github/repositories.controller'
+import { GitHubAppClient } from './github/app.client'
+import { DeliveryProcessor } from './github/delivery.processor'
+import { EventsQueue } from './github/events.queue'
 
 @Module({
   imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }])],
-  controllers: [HealthController, AuthController, WorkspaceController],
-  providers: [PrismaService, AuthService, GitHubClient, WorkspaceService,
+  controllers: [HealthController, AuthController, WorkspaceController, WebhooksController, RepositoriesController],
+  providers: [PrismaService, AuthService, GitHubClient, WorkspaceService, GitHubAppClient, DeliveryProcessor, EventsQueue,
     { provide: APP_GUARD, useClass: ThrottlerGuard }, { provide: APP_GUARD, useClass: SessionGuard }],
 })
 export class AppModule {}

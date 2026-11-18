@@ -4,7 +4,7 @@ if (!url || !new URL(url).pathname.endsWith('_test')) {
   console.error('TEST_DATABASE_URL must point to a dedicated database whose name ends in _test.')
   process.exit(1)
 }
-const env = { ...process.env, DATABASE_URL: url }
+const env = { ...process.env, DATABASE_URL: url, GITHUB_EVENTS_ENABLED: 'false' }
 for (const [file, args] of [
   [require.resolve('prisma/build/index.js'), ['migrate', 'deploy']],
   [require.resolve('jest/bin/jest'), ['--config', 'jest.integration.json', '--runInBand']],

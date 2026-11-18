@@ -3,6 +3,8 @@ dist/
 *.tsbuildinfo
 .DS_Store
 .env
+*.pem
+*.key
 .env.*
 !.env.example
 playwright-report/

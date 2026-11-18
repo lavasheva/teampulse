@@ -1,4 +1,5 @@
 export type Role = 'manager' | 'participant'
+export type * from './api'
 
 export interface DemoUser {
   id: string

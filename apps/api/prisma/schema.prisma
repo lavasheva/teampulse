@@ -52,6 +52,7 @@ model User {
   githubLogin     String
   name            String?
   email           String?
+  verifiedEmails  String[]         @default([])
   avatarUrl       String?
   createdAt       DateTime         @default(now())
   organizations   OrgMembership[]
@@ -71,6 +72,15 @@ model Session {
 
   @@index([expiresAt])
   @@index([userId])
+}
+
+model OAuthAttempt {
+  stateHash   String   @id
+  browserHash String
+  verifier    String
+  expiresAt   DateTime
+
+  @@index([expiresAt])
 }
 
 model Organization {
@@ -154,18 +164,21 @@ model Team {
   memberships TeamMembership[]
   repository  Repository?
 
+  @@unique([id, projectId])
   @@index([projectId])
 }
 
 model TeamMembership {
-  teamId   String   @db.Uuid
-  userId   String   @db.Uuid
-  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role     TeamRole @default(participant)
-  joinedAt DateTime @default(now())
+  teamId    String   @db.Uuid
+  projectId String   @db.Uuid
+  userId    String   @db.Uuid
+  team      Team     @relation(fields: [teamId, projectId], references: [id, projectId], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      TeamRole @default(participant)
+  joinedAt  DateTime @default(now())
 
   @@id([teamId, userId])
+  @@unique([projectId, userId])
   @@index([userId])
 }
 

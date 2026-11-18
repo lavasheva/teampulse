@@ -15,4 +15,9 @@ describe('API configuration', () => {
   it('requires PostgreSQL', () => {
     expect(() => readConfig({ DATABASE_URL: 'mysql://localhost/db' })).toThrow('DATABASE_URL')
   })
+  it('requires HTTPS for the production frontend', () => {
+    expect(() => readConfig({ ...env, NODE_ENV: 'production' })).toThrow('HTTPS')
+    expect(readConfig({ ...env, NODE_ENV: 'production', WEB_ORIGIN: 'https://teampulse.example' }).origin)
+      .toBe('https://teampulse.example')
+  })
 })

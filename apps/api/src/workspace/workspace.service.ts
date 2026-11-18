@@ -1,8 +1,9 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
+import { Prisma, TeamRole } from '@prisma/client'
 import { PrismaService } from '../prisma.service'
 import { hash, token } from '../auth/security'
 import { OrganizationInput, ProjectInput } from './dto'
+import { invalidateWeeks } from '../github/event.store'
 
 const userSelect = { id: true, name: true, githubLogin: true, avatarUrl: true } as const
 
@@ -69,11 +70,11 @@ export class WorkspaceService {
     return this.prisma.team.create({ data: { projectId, name }, select: { id: true, name: true, projectId: true } })
   }
 
-  async createInvitation(userId: string, projectId: string) {
+  async createInvitation(userId: string, projectId: string, role: TeamRole = 'participant') {
     await this.requireManager(userId, projectId)
     const value = token()
     const expiresAt = new Date(Date.now() + 7 * 86400_000)
-    const invitation = await this.prisma.invitation.create({ data: { projectId, tokenHash: hash(value), expiresAt },
+    const invitation = await this.prisma.invitation.create({ data: { projectId, tokenHash: hash(value), expiresAt, role },
       select: { id: true, expiresAt: true } })
     return { ...invitation, token: value }
   }
@@ -88,7 +89,7 @@ export class WorkspaceService {
   async invitation(value: string) {
     if (!/^[A-Za-z0-9_-]{43}$/.test(value)) throw new NotFoundException('Invitation not found')
     const invitation = await this.prisma.invitation.findFirst({ where: { tokenHash: hash(value), revokedAt: null,
-      expiresAt: { gt: new Date() } }, select: { expiresAt: true,
+      expiresAt: { gt: new Date() } }, select: { expiresAt: true, role: true,
       project: { select: { id: true, name: true, organization: { select: { name: true } },
         teams: { select: { id: true, name: true, _count: { select: { memberships: true } } } } } } } })
     if (!invitation) throw new NotFoundException('Invitation not found')
@@ -100,8 +101,8 @@ export class WorkspaceService {
     try {
       return await this.prisma.$transaction(async tx => {
         // Revoke waits for this shared lock. A join cannot succeed after a committed revocation.
-        const rows = await tx.$queryRaw<{ projectId: string }[]>`
-          SELECT "projectId" FROM "Invitation" WHERE "tokenHash" = ${hash(value)}
+        const rows = await tx.$queryRaw<{ projectId: string; role: TeamRole }[]>`
+          SELECT "projectId", "role" FROM "Invitation" WHERE "tokenHash" = ${hash(value)}
           AND "revokedAt" IS NULL AND "expiresAt" > NOW() FOR SHARE`
         const invitation = rows[0]
         if (!invitation) throw new NotFoundException('Invitation not found')
@@ -111,12 +112,16 @@ export class WorkspaceService {
           where: { projectId_userId: { projectId: invitation.projectId, userId } },
         })
         if (existing && existing.teamId !== teamId) throw new ConflictException('Already a member of another team in this project')
-        if (!existing) await tx.teamMembership.create({ data: { teamId, userId, projectId: invitation.projectId, role: 'participant' } })
+        if (!existing) await tx.teamMembership.create({ data: { teamId, userId, projectId: invitation.projectId, role: invitation.role } })
+        if (!existing) {
+          const events = await tx.event.findMany({ where: { repository: { teamId } }, select: { occurredAt: true } })
+          await invalidateWeeks(tx, teamId, events.map(event => event.occurredAt))
+        }
         // Resolve old authors asynchronously on the next scan, without slowing down joining a large team.
         if (!existing) await tx.repository.updateMany({ where: { teamId, syncStatus: 'complete' },
           data: { syncStatus: 'pending', syncCursor: null, syncProcessed: 0, syncRetryAt: null, syncError: null } })
         return { projectId: invitation.projectId, teamId }
-      })
+      }, { timeout: 30000 })
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && ['P2002', 'P2034'].includes(error.code)) {
         throw new ConflictException('Membership changed concurrently; reload and try again')

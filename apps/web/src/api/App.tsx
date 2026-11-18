@@ -114,8 +114,66 @@ function Project() {
         createTeam.mutate(String(new FormData(form).get('name')), { onSuccess: () => form.reset() })
       }}><label className="field">Название команды<input name="name" required maxLength={120} /></label><Button type="submit" disabled={createTeam.isPending}>Добавить команду</Button><ErrorText error={createTeam.error} /></form></Panel>
       <Settings key={project.id} project={project} />
+      <Access project={project} />
     </>}
   </>
+}
+function Access({ project }: { project: LiveProject }) {
+  const access = useQuery({ queryKey: ['api', 'access', project.id], queryFn: () => api.access(project.id), refetchInterval: 15000 })
+  const [observerLink, setObserverLink] = useState('')
+  const [removal, setRemoval] = useState<{ teamId: string; userId: string; name: string } | null>(null)
+  const observer = useApiMutation(() => api.inviteObserver(project.id))
+  const revoke = useApiMutation((id: string) => api.revokeInvitation(project.id, id))
+  const add = useApiMutation((login: string) => api.addManager(project.id, login))
+  const removeManager = useApiMutation((id: string) => api.removeManager(project.id, id))
+  const role = useApiMutation((input: { teamId: string; userId: string; role: 'participant' | 'observer' }) => api.memberRole(project.id, input.teamId, input.userId, input.role))
+  const remove = useApiMutation((input: { teamId: string; userId: string }) => api.removeMember(project.id, input.teamId, input.userId))
+  return <Panel title="Участники и доступ" className="mt-5">
+    <ErrorText error={access.error} />
+    {access.data && <div className="space-y-6">
+      <section><h3 className="font-semibold">Руководители проекта</h3>
+        <p className="my-2 text-sm muted">Владельцы организации сохраняют доступ ко всем её проектам.</p>
+        {access.data.managers.map(user => <div key={user.id} className="my-2 flex flex-wrap items-center justify-between gap-3">
+          <span>{user.name ?? user.githubLogin} (@{user.githubLogin})</span>
+          {access.data.canManageManagers && !access.data.owners.some(owner => owner.id === user.id) &&
+            <Button variant="outline" disabled={removeManager.isPending} onClick={() => removeManager.mutate(user.id)}>Снять права: {user.githubLogin}</Button>}
+        </div>)}
+        {access.data.canManageManagers && <form className="mt-3 flex flex-wrap items-end gap-3" onSubmit={event => {
+          event.preventDefault(); const form = event.currentTarget
+          add.mutate(String(new FormData(form).get('login')), { onSuccess: () => form.reset() })
+        }}><label className="field">GitHub-логин руководителя<input name="login" required maxLength={39} /></label>
+          <Button type="submit" disabled={add.isPending}>Назначить руководителя</Button>
+          <p className="w-full text-sm muted">Пользователь должен сначала войти в TeamPulse.</p></form>}
+        <ErrorText error={add.error} /><ErrorText error={removeManager.error} />
+      </section>
+      <section><h3 className="font-semibold">Участники команд</h3>
+        {project.teams.map(team => <div key={team.id} className="mt-4"><h4>{team.name}</h4>
+          {!team.memberships.length && <p className="text-sm muted">Участников пока нет.</p>}
+          {team.memberships.map(member => <div key={member.user.id} className="my-3 flex flex-wrap items-center gap-3">
+            <span>{member.user.name ?? member.user.githubLogin}</span>
+            <select className="rounded border border-line p-2" aria-label={`Роль ${member.user.githubLogin}`} value={member.role} disabled={role.isPending}
+              onChange={event => role.mutate({ teamId: team.id, userId: member.user.id, role: event.target.value as 'participant' | 'observer' })}>
+              <option value="participant">Участник</option><option value="observer">Наблюдатель</option></select>
+            <Button variant="outline" onClick={() => setRemoval({ teamId: team.id, userId: member.user.id, name: member.user.name ?? member.user.githubLogin })}>Удалить из команды: {member.user.githubLogin}</Button>
+          </div>)}</div>)}
+        <p className="mt-2 text-sm muted">Наблюдатель читает данные своей команды, но не подключает репозиторий и не подтверждает авторство.</p>
+        {removal && <Card className="mt-3 p-4" role="alert"><p>Удалить {removal.name} из команды? Доступ через эту команду закроется. История GitHub сохранится. Другие права пользователя сохраняются. По действующему приглашению можно вступить снова — при необходимости отзовите ссылки.</p>
+          <div className="mt-3 flex gap-3"><Button disabled={remove.isPending} onClick={() => remove.mutate(removal, { onSuccess: () => setRemoval(null) })}>Подтвердить удаление</Button>
+            <Button variant="outline" onClick={() => setRemoval(null)}>Отмена</Button></div></Card>}
+        <ErrorText error={role.error} /><ErrorText error={remove.error} />
+      </section>
+      <section><h3 className="mb-3 font-semibold">Приглашения</h3>
+        <Button variant="outline" disabled={observer.isPending} onClick={() => observer.mutate(undefined, { onSuccess: result => setObserverLink(`${window.location.origin}/invite/${result.token}`) })}>Пригласить наблюдателя</Button>
+        {observerLink && <label className="field mt-3">Ссылка для наблюдателя<input readOnly value={observerLink} onFocus={event => event.currentTarget.select()} /></label>}
+        <p className="my-3 text-sm muted">Скопируйте ссылку после создания. Отзыв запрещает новые вступления; уже вступивших пользователей удаляют отдельно.</p>
+        {!access.data.invitations.length && <p className="text-sm muted">Активных приглашений нет.</p>}
+        {access.data.invitations.map(invitation => <div key={invitation.id} className="my-3 flex flex-wrap items-center justify-between gap-3">
+          <span>{invitation.role === 'observer' ? 'Наблюдатель' : 'Участник'} · создано {new Date(invitation.createdAt).toLocaleString('ru-RU')} · до {new Date(invitation.expiresAt).toLocaleString('ru-RU')}</span>
+          <Button variant="outline" disabled={revoke.isPending} onClick={() => { revoke.mutate(invitation.id); setObserverLink('') }}>Отозвать приглашение</Button>
+        </div>)}<ErrorText error={observer.error} /><ErrorText error={revoke.error} />
+      </section>
+    </div>}
+  </Panel>
 }
 function Settings({ project }: { project: LiveProject }) {
   const [settings, setSettings] = useState<LiveProjectSettings>(project.settings)
@@ -210,7 +268,7 @@ function Invitation() {
   if (invitation.isError) return <EmptyState title="Приглашение недоступно"><ErrorText error={invitation.error} /><Link to="/projects">Мои проекты</Link></EmptyState>
   return <Panel title={`Приглашение: ${invitation.data.project.name}`}><form className="space-y-4" onSubmit={event => {
     event.preventDefault(); accept.mutate(team || invitation.data.project.teams[0]?.id || '', { onSuccess: result => navigate(`/projects/${result.projectId}/teams/${result.teamId}`) })
-  }}><p>{invitation.data.project.organization.name}</p><label className="field">Команда<select value={team || invitation.data.project.teams[0]?.id || ''} onChange={e => setTeam(e.target.value)}>
+  }}><p>{invitation.data.project.organization.name}</p><p>Роль: {invitation.data.role === 'observer' ? 'наблюдатель (только чтение)' : 'участник'}</p><label className="field">Команда<select value={team || invitation.data.project.teams[0]?.id || ''} onChange={e => setTeam(e.target.value)}>
     {invitation.data.project.teams.map(item => <option key={item.id} value={item.id}>{item.name} · участников: {item._count.memberships}</option>)}</select></label>
     <Button type="submit" disabled={accept.isPending || !invitation.data.project.teams.length}>Вступить в команду</Button><ErrorText error={accept.error} /></form></Panel>
 }

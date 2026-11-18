@@ -22,13 +22,14 @@ export class AnalyticsInputService {
         gte: new Date(Math.max(starts.getTime(), team.project.startsOn.getTime())),
         lt: new Date(Math.min(end.getTime(), projectEnd.getTime())),
       } }, include: { author: { select: { userId: true } } }, orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }] })
+      const participants = new Set(team.memberships.map(member => member.userId))
       return { teamId, projectId: team.projectId, weekStartsOn, weekEndsBefore: end.toISOString().slice(0, 10), sourceVersion,
         settings: { name: team.project.name, startsOn: team.project.startsOn.toISOString().slice(0, 10), endsOn: team.project.endsOn.toISOString().slice(0, 10),
           weights: team.project.weights, thresholds: team.project.thresholds,
           milestones: team.project.milestones.map(point => ({ id: point.id, title: point.title, date: point.date.toISOString().slice(0, 10) })) },
         members: team.memberships.map(({ user }) => ({ id: user.id, name: user.name, githubLogin: user.githubLogin, avatarUrl: user.avatarUrl })),
         events: events.map(event => ({ id: event.id, kind: event.kind, occurredAt: event.occurredAt.toISOString(),
-          actorId: event.author?.userId ?? null, payload: event.payload, details: event.details })),
+          actorId: event.author?.userId && participants.has(event.author.userId) ? event.author.userId : null, payload: event.payload, details: event.details })),
       }
     }, { isolationLevel: 'RepeatableRead' })
   }

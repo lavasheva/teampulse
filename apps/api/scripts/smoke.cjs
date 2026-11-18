@@ -5,12 +5,11 @@ async function main() {
   // Port 0 lets the OS choose a free port for the real application module.
   const { NestFactory } = require('@nestjs/core')
   const { AppModule } = require('../dist/app.module')
-  const { readConfig } = require('../dist/config')
-  const config = readConfig()
+  const { configureApp } = require('../dist/setup')
+  const config = require('../dist/config').readConfig()
   const app = await NestFactory.create(AppModule, { logger: false, abortOnError: false })
   try {
-    app.setGlobalPrefix('api')
-    app.enableCors({ origin: config.origin, credentials: true })
+    configureApp(app)
     await app.listen(0, '127.0.0.1')
     const base = await app.getUrl()
     const live = await fetch(`${base}/api/health/live`)

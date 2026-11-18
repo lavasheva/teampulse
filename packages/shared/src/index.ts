@@ -1,5 +1,6 @@
 export type Role = 'manager' | 'participant'
 export type * from './api'
+export type * from './analytics'
 
 export interface DemoUser {
   id: string

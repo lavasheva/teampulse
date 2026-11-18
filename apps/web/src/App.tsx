@@ -4,8 +4,11 @@ import { RequireSession } from './components/session'
 import { Invite, Login, Member, NotFound, Overview, Participants, Projects, Report, Settings, Summaries, Team } from './pages'
 import { paths } from './routes'
 import { useWorkspaceStorageEvents } from './data/workspace'
+import { lazy, Suspense } from 'react'
 
-export default function App() {
+const ApiApp = lazy(() => import('./api/App'))
+
+function DemoApp() {
   useWorkspaceStorageEvents()
   return (
     <BrowserRouter>
@@ -31,4 +34,10 @@ export default function App() {
       </Routes>
     </BrowserRouter>
   )
+}
+
+export default function App() {
+  return import.meta.env.VITE_DATA_SOURCE === 'api'
+    ? <Suspense fallback={<main className="p-8" role="status">Загружаем TeamPulse…</main>}><ApiApp /></Suspense>
+    : <DemoApp />
 }

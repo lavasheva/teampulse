@@ -1,8 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common'
 import { Queue, Worker } from 'bullmq'
 import { PrismaService } from '../prisma.service'
 import { DeliveryProcessor } from './delivery.processor'
 import { Prisma } from '@prisma/client'
+import { HistoryService } from './history.service'
 
 export function redisConnection(value: string) {
   const url = new URL(value)
@@ -24,7 +25,8 @@ export class EventsQueue implements OnModuleInit, OnModuleDestroy {
   private dispatching?: Promise<void>
   private readonly logger = new Logger(EventsQueue.name)
 
-  constructor(private readonly prisma: PrismaService, private readonly processor: DeliveryProcessor) {}
+  constructor(private readonly prisma: PrismaService, private readonly processor: DeliveryProcessor,
+    @Optional() private readonly history?: HistoryService) {}
 
   onModuleInit() {
     if (process.env.GITHUB_EVENTS_ENABLED !== 'true') return
@@ -32,7 +34,8 @@ export class EventsQueue implements OnModuleInit, OnModuleDestroy {
     const connection = redisConnection(process.env.REDIS_URL)
     const queueName = process.env.GITHUB_QUEUE_NAME ?? 'github-deliveries'
     this.queue = new Queue(queueName, { connection: { ...connection, maxRetriesPerRequest: 1, enableOfflineQueue: false } })
-    this.worker = new Worker(queueName, job => this.processor.process(String(job.data.deliveryId)), {
+    this.worker = new Worker(queueName, job => job.name === 'sync-history' && this.history
+      ? this.history.run(String(job.data.repositoryId)) : this.processor.process(String(job.data.deliveryId)), {
       connection, concurrency: 1,
     })
     this.queue.on('error', () => { /* Pending PostgreSQL rows remain recoverable. */ })
@@ -60,6 +63,19 @@ export class EventsQueue implements OnModuleInit, OnModuleDestroy {
       if (existing && ['failed', 'completed'].includes(await existing.getState())) await existing.remove()
       await this.queue.add('process-delivery', { deliveryId: row.id }, { jobId: row.id,
         attempts: 5, backoff: { type: 'exponential', delay: 1000 }, removeOnComplete: true, removeOnFail: false })
+    }
+    if (!this.history) return
+    await this.history.reconcileDue()
+    const repositories = await this.prisma.repository.findMany({ where: { syncStatus: { in: ['pending', 'running'] },
+      AND: [{ OR: [{ syncRetryAt: null }, { syncRetryAt: { lte: new Date() } }] },
+        { OR: [{ syncLeaseUntil: null }, { syncLeaseUntil: { lte: new Date() } }] }] },
+      take: 100, select: { id: true } })
+    for (const repository of repositories) {
+      const id = `history-${repository.id}`, existing = await this.queue.getJob(id)
+      if (existing && ['completed', 'failed'].includes(await existing.getState())) await existing.remove()
+      await this.queue.add('sync-history', { repositoryId: repository.id }, {
+        jobId: id, removeOnComplete: true, removeOnFail: false,
+      })
     }
   }
 

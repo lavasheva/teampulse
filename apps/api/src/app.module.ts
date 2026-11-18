@@ -14,11 +14,16 @@ import { RepositoriesController } from './github/repositories.controller'
 import { GitHubAppClient } from './github/app.client'
 import { DeliveryProcessor } from './github/delivery.processor'
 import { EventsQueue } from './github/events.queue'
+import { EventStore } from './github/event.store'
+import { HistorySource } from './github/history.source'
+import { HistoryService } from './github/history.service'
+import { IdentitiesController } from './github/identities.controller'
 
 @Module({
   imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }])],
-  controllers: [HealthController, AuthController, WorkspaceController, WebhooksController, RepositoriesController],
+  controllers: [HealthController, AuthController, WorkspaceController, WebhooksController, RepositoriesController, IdentitiesController],
   providers: [PrismaService, AuthService, GitHubClient, WorkspaceService, GitHubAppClient, DeliveryProcessor, EventsQueue,
+    EventStore, HistorySource, HistoryService,
     { provide: APP_GUARD, useClass: ThrottlerGuard }, { provide: APP_GUARD, useClass: SessionGuard }],
 })
 export class AppModule {}

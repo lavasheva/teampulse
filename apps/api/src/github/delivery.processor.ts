@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
 import { PrismaService } from '../prisma.service'
 import type { DeliveryPayload } from './normalize'
+import { EventStore } from './event.store'
 
 @Injectable()
 export class DeliveryProcessor {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly events: EventStore) {}
 
   async process(id: string) {
     try {
@@ -22,22 +22,7 @@ export class DeliveryProcessor {
         } else if (delivery.repositoryId) {
           const repository = await tx.repository.findFirst({ where: { id: delivery.repositoryId,
             installationId: data.installationId, syncStatus: { not: 'disconnected' } } })
-          if (repository) for (const event of data.events) {
-            // Only immutable numeric GitHub identity can be matched now. Email claims are stage 4.
-            const member = event.author.githubId ? await tx.user.findFirst({ where: {
-              githubId: event.author.githubId, teams: { some: { teamId: repository.teamId } },
-            } }) : null
-            const author = await tx.gitIdentity.upsert({ where: { repositoryId_provider_authorKey: {
-              repositoryId: repository.id, provider: 'github', authorKey: event.author.key } },
-              create: { repositoryId: repository.id, authorKey: event.author.key,
-                login: event.author.login, email: event.author.email, userId: member?.id },
-              update: {} })
-            await tx.event.upsert({ where: { repositoryId_externalId: {
-              repositoryId: repository.id, externalId: event.externalId } }, update: {},
-              create: { repositoryId: repository.id, externalId: event.externalId, kind: event.kind,
-                authorId: author.id, occurredAt: new Date(event.occurredAt),
-                payload: event.payload as unknown as Prisma.InputJsonValue } })
-          }
+          if (repository) await this.events.save(tx, repository, data.events)
         }
         await tx.webhookDelivery.update({ where: { id }, data: {
           status: 'complete', processedAt: new Date(), attempts: { increment: 1 }, lastError: null } })

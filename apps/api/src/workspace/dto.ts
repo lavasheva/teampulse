@@ -1,4 +1,4 @@
-import { IsDateString, IsIn, IsString, IsUUID, Length, Matches } from 'class-validator'
+import { IsDateString, IsIn, IsOptional, IsString, IsUUID, Length, Matches } from 'class-validator'
 import { Transform } from 'class-transformer'
 
 export class OrganizationInput {
@@ -30,4 +30,15 @@ export class ProjectInput extends TeamInput {
 
 export class JoinInput {
   @IsUUID() teamId!: string
+}
+
+export class InvitationInput {
+  @IsOptional() @IsIn(['participant', 'observer']) role?: 'participant' | 'observer'
+}
+export class MemberRoleInput {
+  @IsIn(['participant', 'observer']) role!: 'participant' | 'observer'
+}
+export class ManagerInput {
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @IsString() @Matches(/^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/) githubLogin!: string
 }

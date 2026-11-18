@@ -1,6 +1,6 @@
 import type { AuthSessionResponse, CollectedEventsResponse, CreateOrganizationInput, CreateProjectInput,
   CreatedInvitationResponse, CreatedProjectResponse, InvitationResponse, LiveProjectSettings, LiveWorkspaceResponse,
-  MemberActivityResponse, OrganizationResponse, RepositorySyncResponse, UnmatchedIdentitiesResponse } from '@teampulse/shared'
+  MemberActivityResponse, OrganizationResponse, ProjectAccessResponse, RepositorySyncResponse, UnmatchedIdentitiesResponse } from '@teampulse/shared'
 
 export class ApiError extends Error {
   readonly status: number
@@ -38,6 +38,15 @@ export const api = {
   createTeam: (projectId: string, name: string) => request(`/projects/${id(projectId)}/teams`, 'POST', { name }),
   saveSettings: (projectId: string, input: LiveProjectSettings) => request<LiveProjectSettings>(`/projects/${id(projectId)}/settings`, 'PUT', input),
   invite: (projectId: string) => request<CreatedInvitationResponse>(`/projects/${id(projectId)}/invitations`, 'POST'),
+  inviteObserver: (projectId: string) => request<CreatedInvitationResponse>(`/projects/${id(projectId)}/invitations`, 'POST', { role: 'observer' }),
+  access: (projectId: string) => request<ProjectAccessResponse>(`/projects/${id(projectId)}/access`),
+  revokeInvitation: (projectId: string, invitationId: string) => request<void>(`/projects/${id(projectId)}/invitations/${id(invitationId)}`, 'DELETE'),
+  addManager: (projectId: string, githubLogin: string) => request(`/projects/${id(projectId)}/managers`, 'POST', { githubLogin }),
+  removeManager: (projectId: string, userId: string) => request<void>(`/projects/${id(projectId)}/managers/${id(userId)}`, 'DELETE'),
+  memberRole: (projectId: string, teamId: string, userId: string, role: 'participant' | 'observer') =>
+    request<void>(`/projects/${id(projectId)}/teams/${id(teamId)}/members/${id(userId)}`, 'PUT', { role }),
+  removeMember: (projectId: string, teamId: string, userId: string) =>
+    request<void>(`/projects/${id(projectId)}/teams/${id(teamId)}/members/${id(userId)}`, 'DELETE'),
   invitation: (token: string) => request<InvitationResponse>(`/invitations/${id(token)}`),
   accept: (token: string, teamId: string) => request<{ projectId: string; teamId: string }>(`/invitations/${id(token)}/accept`, 'POST', { teamId }),
   app: () => request<{ installationUrl: string | null }>('/github/app'),

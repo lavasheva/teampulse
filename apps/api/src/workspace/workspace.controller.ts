@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Req } from '@nestjs/common'
 import type { AuthRequest } from '../auth/security'
-import { JoinInput, OrganizationInput, ProjectInput, TeamInput } from './dto'
+import { InvitationInput, JoinInput, OrganizationInput, ProjectInput, TeamInput } from './dto'
 import { WorkspaceService } from './workspace.service'
 
 @Controller()
@@ -33,8 +33,8 @@ export class WorkspaceController {
   }
 
   @Post('projects/:projectId/invitations')
-  invite(@Req() req: AuthRequest, @Param('projectId', ParseUUIDPipe) id: string) {
-    return this.workspace.createInvitation(req.user.id, id)
+  invite(@Req() req: AuthRequest, @Param('projectId', ParseUUIDPipe) id: string, @Body() input: InvitationInput) {
+    return this.workspace.createInvitation(req.user.id, id, input?.role ?? 'participant')
   }
 
   @Delete('projects/:projectId/invitations/:invitationId')

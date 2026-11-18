@@ -23,6 +23,7 @@ export interface TeamResponse extends TeamListItem {
 }
 export interface CreatedInvitationResponse { id: string; token: string; expiresAt: string }
 export interface InvitationResponse {
+  role: 'participant' | 'observer'
   expiresAt: string
   project: { id: string; name: string; organization: { name: string }
     teams: (TeamListItem & { _count: { memberships: number } })[] }
@@ -78,4 +79,11 @@ export interface MemberActivityResponse {
   role: 'participant' | 'observer'; user: ApiUser
   rawActivity: { kind: CollectedEventResponse['kind']; count: number }[]
   analytics: { status: 'not_configured' }
+}
+
+export interface ProjectAccessResponse {
+  canManageManagers: boolean
+  owners: ApiUser[]
+  managers: ApiUser[]
+  invitations: { id: string; role: 'participant' | 'observer'; createdAt: string; expiresAt: string }[]
 }

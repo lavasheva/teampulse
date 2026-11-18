@@ -29,7 +29,7 @@ async function start() {
       authorizationUrl(state) { return `http://127.0.0.1:3010/__test/authorize?state=${encodeURIComponent(state)}` },
       async profile(code) {
         if (!['teacher', 'student'].includes(code)) throw new Error('Unknown test identity')
-        return { githubId: code === 'teacher' ? teacherId : `e2e-student-${runId}`, githubLogin: `e2e-${code}-${runId}`,
+        return { githubId: code === 'teacher' ? teacherId : `e2e-student-${runId}`, githubLogin: `e2e-${code}-${runId.slice(0, 8)}`,
           name: code === 'teacher' ? 'Руководитель API' : 'Студент API', avatarUrl: null,
           email: `${code}@example.test`, verifiedEmails: [`${code}@example.test`] }
       },

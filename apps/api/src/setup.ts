@@ -1,6 +1,9 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common'
+import { raw } from 'express'
 
 export function configureApp(app: INestApplication) {
+  // Register before Nest's JSON parser: signatures are checked against the original bytes.
+  app.use('/api/webhooks/github', raw({ type: 'application/json', limit: '2mb' }))
   app.setGlobalPrefix('api')
   app.enableCors({ origin: process.env.WEB_ORIGIN ?? 'http://localhost:5173', credentials: true })
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))

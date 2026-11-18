@@ -2,6 +2,8 @@
 
 NestJS + Prisma/PostgreSQL. Реализованы основа сервера и этап 2: OAuth, сессии, организации, проекты, команды, приглашения и проверка доступа. [Контракт API и настройка OAuth](../../docs/api-stage-2.md). Очередь и сбор событий — следующие этапы из `docs/backend-plan.md`.
 
+Этап 3 добавляет [GitHub App и вебхуки с очередью](../../docs/api-stage-3.md). Для запуска worker нужны Redis и `GITHUB_EVENTS_ENABLED=true`. История репозитория загружается на следующем этапе; статус pending подключения пока означает ожидание этой реализации.
+
 ## Запуск из корня репозитория (PowerShell)
 
 Нужны Node.js 24, pnpm и запущенный Docker Desktop с Linux containers.

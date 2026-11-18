@@ -244,6 +244,9 @@ model WebhookDelivery {
   receivedAt   DateTime       @default(now())
   processedAt  DateTime?
   attempts     Int            @default(0)
+  contentHash  String?
+  payload      Json?
+  lastError    String?
 
   @@index([status, receivedAt])
   @@index([repositoryId])

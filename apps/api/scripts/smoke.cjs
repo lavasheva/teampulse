@@ -19,7 +19,8 @@ async function main() {
       headers: { Origin: config.origin },
     })
     assert.equal(ready.status, 200)
-    assert.deepEqual(await ready.json(), { status: 'ok', database: 'up' })
+    assert.deepEqual(await ready.json(), { status: 'ok', database: 'up',
+      ...(process.env.GITHUB_EVENTS_ENABLED === 'true' ? { redis: 'up' } : {}) })
     assert.equal(ready.headers.get('access-control-allow-origin'), config.origin)
     console.log('Smoke passed: real PostgreSQL connection, liveness, readiness, CORS.')
   } finally {

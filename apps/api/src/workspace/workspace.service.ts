@@ -112,6 +112,9 @@ export class WorkspaceService {
         })
         if (existing && existing.teamId !== teamId) throw new ConflictException('Already a member of another team in this project')
         if (!existing) await tx.teamMembership.create({ data: { teamId, userId, projectId: invitation.projectId, role: 'participant' } })
+        // Resolve old authors asynchronously on the next scan, without slowing down joining a large team.
+        if (!existing) await tx.repository.updateMany({ where: { teamId, syncStatus: 'complete' },
+          data: { syncStatus: 'pending', syncCursor: null, syncProcessed: 0, syncRetryAt: null, syncError: null } })
         return { projectId: invitation.projectId, teamId }
       })
     } catch (error) {

@@ -59,18 +59,20 @@ export function normalize(event: string, input: unknown): DeliveryPayload | null
       occurredAt: p.action === 'opened' ? pr.created_at : pr.merged_at ?? pr.closed_at ?? pr.created_at,
       payload: { title: pr.title, url: pr.html_url } }]
   } else if (event === 'pull_request_review') {
-    const p = z.object({ action: z.string(), review: z.object({ id, user, submitted_at: date,
+    const p = z.object({ action: z.string(), review: z.object({ id, user: user.nullable(), submitted_at: date,
       html_url: z.string().url() }), pull_request: z.object({ title }) }).parse(input)
     if (p.action !== 'submitted') return null
-    result.events = [{ externalId: `review:${p.review.id}`, kind: 'review', author: actor(p.review.user),
+    result.events = [{ externalId: `review:${p.review.id}`, kind: 'review', author: p.review.user ? actor(p.review.user) :
+      { key: `unknown:review:${p.review.id}`, login: null, email: null, githubId: null },
       occurredAt: p.review.submitted_at, payload: { title: p.pull_request.title, url: p.review.html_url } }]
   } else {
-    const p = z.object({ action: z.string(), sender: user, issue: z.object({ id, title, user,
+    const p = z.object({ action: z.string(), sender: user.nullable(), issue: z.object({ id, title, user,
       created_at: date, closed_at: date.nullable(), html_url: z.string().url() }) }).parse(input)
     if (!['opened', 'closed'].includes(p.action)) return null
     const issue = p.issue, kind = p.action === 'opened' ? 'issue_opened' : 'issue_closed'
+    const author = p.action === 'opened' ? issue.user : p.sender
     result.events = [{ externalId: `${kind}:${issue.id}:${p.action === 'opened' ? issue.created_at : issue.closed_at}`,
-      kind, author: actor(p.action === 'opened' ? issue.user : p.sender),
+      kind, author: author ? actor(author) : { key: `unknown:issue:${issue.id}`, login: null, email: null, githubId: null },
       occurredAt: p.action === 'opened' ? issue.created_at : issue.closed_at ?? issue.created_at,
       payload: { title: issue.title, url: issue.html_url } }]
   }

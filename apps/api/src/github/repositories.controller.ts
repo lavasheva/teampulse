@@ -39,7 +39,9 @@ export class RepositoriesController {
         if (previous && previous.externalId !== verified.externalId) throw new ConflictException('Team already has a different repository')
         return tx.repository.upsert({ where: { teamId },
           create: { teamId, ...verified, installationId: input.installationId },
-          update: { fullName: verified.fullName, installationId: input.installationId, syncStatus: 'pending' },
+          update: { fullName: verified.fullName, installationId: input.installationId, syncStatus: 'pending',
+            syncCursor: null, syncProcessed: 0, syncFailures: 0, syncError: null, syncRetryAt: null,
+            syncLeaseToken: null, syncLeaseUntil: null },
           select: { id: true, fullName: true, syncStatus: true } })
       })
     } catch (error) {

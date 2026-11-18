@@ -1,8 +1,31 @@
 import { ForbiddenException, Injectable, ServiceUnavailableException } from '@nestjs/common'
 import { readFile } from 'node:fs/promises'
+import type { App } from 'octokit'
 
 @Injectable()
 export class GitHubAppClient {
+  private readonly clients = new Map<string, ReturnType<App['getInstallationOctokit']>>()
+
+  installationClient(installationId: string) {
+    let client = this.clients.get(installationId)
+    if (!client) {
+      client = this.createInstallationClient(installationId)
+      this.clients.set(installationId, client)
+      void client.catch(() => this.clients.delete(installationId))
+    }
+    return client
+  }
+
+  private async createInstallationClient(installationId: string) {
+    const appId = process.env.GITHUB_APP_ID, path = process.env.GITHUB_APP_PRIVATE_KEY_PATH
+    if (!appId || !path) throw new ServiceUnavailableException('GitHub App is not configured')
+    const { App, Octokit } = await import('octokit')
+    const app = new App({ appId, privateKey: await readFile(path, 'utf8'), Octokit: Octokit.defaults({
+      log: { debug() {}, info() {}, warn() {}, error() {} }, request: { timeout: 15000 },
+      throttle: { enabled: false }, retry: { enabled: false },
+    }) })
+    return app.getInstallationOctokit(Number(installationId))
+  }
   async verifyRepository(installationId: string, fullName: string, githubId: string) {
     const appId = process.env.GITHUB_APP_ID, path = process.env.GITHUB_APP_PRIVATE_KEY_PATH
     if (!appId || !path) throw new ServiceUnavailableException('GitHub App is not configured')

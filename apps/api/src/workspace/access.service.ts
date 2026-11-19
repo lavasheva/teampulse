@@ -3,6 +3,7 @@ import { Prisma, TeamRole } from '@prisma/client'
 import { PrismaService } from '../prisma.service'
 import { WorkspaceService } from './workspace.service'
 import { invalidateWeeks } from '../github/event.store'
+import { recordAudit } from './audit'
 
 const publicUser = { id: true, githubLogin: true, name: true, avatarUrl: true } as const
 @Injectable()
@@ -38,8 +39,10 @@ export class AccessService {
       const users = await tx.user.findMany({ where: { githubLogin: { equals: githubLogin, mode: 'insensitive' } }, take: 2, select: publicUser })
       if (users.length !== 1) throw new BadRequestException('Пользователь должен сначала войти в TeamPulse через GitHub. Проверьте логин.')
       const user = users[0]
+      const existing = await tx.projectManager.findUnique({ where: { projectId_userId: { projectId, userId: user.id } } })
       await tx.projectManager.upsert({ where: { projectId_userId: { projectId, userId: user.id } },
         create: { projectId, userId: user.id }, update: {} })
+      if (!existing) await recordAudit(tx, { projectId, actorId: userId, action: 'manager_added', targetId: user.id, subject: user.githubLogin })
       return user
     })
   }
@@ -51,6 +54,8 @@ export class AccessService {
       if (owner) throw new BadRequestException('Владелец организации сохраняет доступ к проекту.')
       const result = await tx.projectManager.deleteMany({ where: { projectId, userId: targetId } })
       if (!result.count) throw new NotFoundException('Manager not found')
+      const target = await tx.user.findUnique({ where: { id: targetId }, select: { githubLogin: true } })
+      await recordAudit(tx, { projectId, actorId: userId, action: 'manager_removed', targetId, subject: target?.githubLogin })
     })
   }
 
@@ -62,6 +67,9 @@ export class AccessService {
       if (role === member.role) return
       if (role) await tx.teamMembership.update({ where: { teamId_userId: { teamId, userId: targetId } }, data: { role } })
       else await tx.teamMembership.delete({ where: { teamId_userId: { teamId, userId: targetId } } })
+      const target = await tx.user.findUnique({ where: { id: targetId }, select: { githubLogin: true } })
+      await recordAudit(tx, { projectId, actorId: userId, action: role ? 'member_role_changed' : 'member_removed', teamId, targetId,
+        subject: target?.githubLogin, beforeRole: member.role, ...(role ? { afterRole: role } : {}) })
       const events = await tx.event.findMany({ where: { repository: { teamId } }, select: { occurredAt: true } })
       await invalidateWeeks(tx, teamId, events.map(event => event.occurredAt))
       // Keep immutable history and attribution; analytics considers only current participants.

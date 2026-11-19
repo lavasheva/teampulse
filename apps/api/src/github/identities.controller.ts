@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma.service'
 import { WorkspaceService } from '../workspace/workspace.service'
 import { HistoryService } from './history.service'
 import { invalidateWeeks } from './event.store'
+import { recordAudit } from '../workspace/audit'
 
 @Controller('teams/:teamId')
 export class IdentitiesController {
@@ -73,6 +74,7 @@ export class IdentitiesController {
       if (current.userId === req.user.id) return { id: identityId, userId: req.user.id }
       await tx.gitIdentity.update({ where: { id: identityId }, data: { userId: req.user.id, resolution: 'claimed' } })
       await tx.identityResolution.create({ data: { identityId, actorId: req.user.id, toUserId: req.user.id, reason: 'claimed' } })
+      await recordAudit(tx, { projectId: membership.projectId, actorId: req.user.id, action: 'identity_claimed', teamId, targetId: identityId, subject: current.login ?? 'Автор GitHub' })
       const events = await tx.event.findMany({ where: { authorId: identityId }, select: { occurredAt: true } })
       await invalidateWeeks(tx, identity.repository.teamId, events.map(event => event.occurredAt))
       return { id: identityId, userId: req.user.id }

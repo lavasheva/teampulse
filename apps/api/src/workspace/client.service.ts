@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { PrismaService } from '../prisma.service'
 import { WorkspaceService } from './workspace.service'
 import { invalidateWeeks } from '../github/event.store'
+import { recordAudit } from './audit'
 
 const day = z.iso.date()
 const settingsSchema = z.object({
@@ -73,6 +74,7 @@ export class ClientService {
       const dates = new Map<string, Date[]>()
       for (const event of events) dates.set(event.repository.teamId, [...(dates.get(event.repository.teamId) ?? []), event.occurredAt])
       for (const [teamId, weeks] of dates) await invalidateWeeks(tx, teamId, weeks)
+      await recordAudit(tx, { projectId, actorId: userId, action: 'settings_updated' })
       return { ...value }
     }, { timeout: 30000 })
   }

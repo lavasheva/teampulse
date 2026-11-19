@@ -1,13 +1,14 @@
 import { useState, type ReactNode } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
-import type { LiveProject, LiveProjectSettings } from '@teampulse/shared'
+import type { EventFilters, LiveProject, LiveProjectSettings } from '@teampulse/shared'
 import { Badge, Brand, Button, Card, EmptyState, PageHeader, Panel } from '../components/ui'
 import { api } from './client'
 import { sessionKey, useApiMutation, useLiveWorkspace, useSession } from './hooks'
 import { WorkspaceFrame } from '../components/workspace-frame'
 import { CollectedTeamCard } from '../components/project-team-card'
 import { CollectedMembers } from '../components/contributions'
+import { auditLabels, eventLabels, roleLabel } from './labels'
 
 function ErrorText({ error }: { error: unknown }) {
   return error ? <p role="alert" className="mt-3 text-sm">{error instanceof Error ? error.message : 'Не удалось выполнить запрос.'}</p> : null
@@ -39,7 +40,7 @@ function Shell({ children }: { children: ReactNode }) {
   } })
   return session.data ? <WorkspaceFrame
     projects={(workspace.data?.projects ?? []).map(project => ({ id: project.id, name: project.settings.name,
-      canManage: project.canManage, firstTeamId: project.teams[0]?.id, visible: true }))}
+      canManage: project.canManage, firstTeamId: project.teams[0]?.id, visible: true, auditAvailable: true }))}
     user={{ name: session.data.user.name ?? session.data.user.githubLogin, label: 'Аккаунт GitHub' }}
     allowCreate={Boolean(workspace.data?.organizations.length)} loggingOut={logout.isPending} onLogout={() => logout.mutate()}
   >{children}<ErrorText error={logout.error} /></WorkspaceFrame> : <>{children}</>
@@ -131,16 +132,17 @@ function Project() {
     </>}
   </>
 }
-function ProjectSection({ section }: { section: 'participants' | 'settings' | 'summaries' | 'report' }) {
+function ProjectSection({ section }: { section: 'participants' | 'settings' | 'summaries' | 'report' | 'audit' }) {
   const { projectId, teamId } = useParams(), workspace = useLiveWorkspace()
   if (workspace.isPending) return <Loading />
   if (workspace.isError) return <ErrorText error={workspace.error} />
   const project = workspace.data.projects.find(item => item.id === projectId)
   if (!project || (teamId && !project.teams.some(team => team.id === teamId))) return <EmptyState title="Проект недоступен"><Link to="/projects">Мои проекты</Link></EmptyState>
   if (section === 'settings' && !project.canManage) return <EmptyState title="Настройки недоступны"><p>Изменять настройки может руководитель проекта.</p></EmptyState>
-  const title = { participants: 'Участники', settings: 'Настройки', summaries: 'Сводки', report: 'Итоговый отчёт' }[section]
+  if (section === 'audit' && !project.canManage) return <EmptyState title="Журнал недоступен"><p>Журнал доступен руководителю и владельцу проекта.</p></EmptyState>
+  const title = { participants: 'Участники', settings: 'Настройки', summaries: 'Сводки', report: 'Итоговый отчёт', audit: 'Журнал действий' }[section]
   return <><PageHeader title={title} eyebrow={<Link to={`/projects/${project.id}`}>{project.settings.name}</Link>} />
-    {section === 'settings' ? <Settings key={project.id} project={project} />
+    {section === 'audit' ? <Audit project={project} /> : section === 'settings' ? <Settings key={project.id} project={project} />
       : section === 'participants' ? <div className="space-y-5">
         {project.teams.map(team => <section key={team.id}><h2 className="mb-3"><Link to={`/projects/${project.id}/teams/${team.id}`}>{team.name}</Link></h2><CollectedMembers projectId={project.id} team={team} /></section>)}
         {project.canManage && <Access project={project} />}
@@ -149,6 +151,21 @@ function ProjectSection({ section }: { section: 'participants' | 'settings' | 's
         <Link to={`/projects/${project.id}`}>Перейти к командам и событиям</Link>
       </EmptyState>}
   </>
+}
+function Audit({ project }: { project: LiveProject }) {
+  const entries = useInfiniteQuery({ queryKey: ['api', 'audit', project.id], initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => api.audit(project.id, pageParam), getNextPageParam: page => page.nextCursor ?? undefined, refetchInterval: 15000 })
+  return <Panel title="Изменения проекта">
+    <p className="mb-4 text-sm muted">Действия записываются с момента подключения журнала. Ранее выполненные изменения не восстанавливаются задним числом.</p>
+    {entries.isPending && <Loading />}<ErrorText error={entries.error} />
+    {entries.data?.pages.flatMap(page => page.entries).map(entry => <article key={entry.id} className="border-b border-line py-3">
+      <p className="break-words text-sm font-semibold">{auditLabels[entry.action]}{entry.subject ? ` · ${entry.subject}` : ''}</p>
+      {(entry.beforeRole || entry.afterRole) && <p className="mt-1 text-sm muted">{entry.beforeRole ? roleLabel(entry.beforeRole) : '—'} → {entry.afterRole ? roleLabel(entry.afterRole) : '—'}</p>}
+      <p className="mt-1 text-xs muted">{entry.actorLogin ? `@${entry.actorLogin}` : 'Пользователь удалён'} · {new Date(entry.createdAt).toLocaleString('ru-RU')}{entry.teamId ? ` · ${project.teams.find(team => team.id === entry.teamId)?.name ?? 'Команда'}` : ''}</p>
+    </article>)}
+    {entries.data?.pages[0]?.entries.length === 0 && <p>Действий пока нет.</p>}
+    {entries.hasNextPage && <Button variant="outline" disabled={entries.isFetchingNextPage} onClick={() => void entries.fetchNextPage()}>Ещё действия</Button>}
+  </Panel>
 }
 function Access({ project }: { project: LiveProject }) {
   const access = useQuery({ queryKey: ['api', 'access', project.id], queryFn: () => api.access(project.id), refetchInterval: 15000 })
@@ -235,9 +252,11 @@ function Team() {
   const { projectId, teamId = '' } = useParams(), workspace = useLiveWorkspace()
   const [params, setParams] = useSearchParams()
   const tab = ['overview', 'members', 'events'].includes(params.get('tab') ?? '') ? params.get('tab')! : 'overview'
+  const filters: EventFilters = { kind: (params.get('kind') || undefined) as EventFilters['kind'], author: params.get('author') || undefined,
+    from: params.get('from') || undefined, to: params.get('to') || undefined }
   const project = workspace.data?.projects.find(p => p.id === projectId), team = project?.teams.find(t => t.id === teamId)
   const status = useQuery({ queryKey: ['api', 'sync', teamId], queryFn: () => api.syncStatus(teamId), enabled: Boolean(team?.repository), refetchInterval: 5000 })
-  const events = useInfiniteQuery({ queryKey: ['api', 'events', teamId], queryFn: ({ pageParam }) => api.events(teamId, pageParam),
+  const events = useInfiniteQuery({ queryKey: ['api', 'events', teamId, filters], queryFn: ({ pageParam }) => api.events(teamId, pageParam, filters),
     initialPageParam: undefined as string | undefined, getNextPageParam: page => page.nextCursor ?? undefined, enabled: Boolean(team), refetchInterval: 15000 })
   const unmatched = useInfiniteQuery({ queryKey: ['api', 'unmatched', teamId], queryFn: ({ pageParam }) => api.unmatched(teamId, pageParam),
     initialPageParam: undefined as string | undefined, getNextPageParam: page => page.nextCursor ?? undefined, enabled: Boolean(team), refetchInterval: 15000 })
@@ -256,10 +275,10 @@ function Team() {
       actions={team.repository && team.repository.syncStatus !== 'disconnected' && team.canConnect && <Button disabled={sync.isPending} onClick={() => sync.mutate()}>Обновить историю</Button>} />
     <ErrorText error={sync.error} />
     <div className="page-tabs" aria-label="Раздел команды">
-      <button type="button" aria-pressed={tab === 'overview'} onClick={() => setParams({})}>Обзор</button>
-      <button type="button" aria-pressed={tab === 'members'} onClick={() => setParams({ tab: 'members' })}>Участники</button>
+      <button type="button" aria-pressed={tab === 'overview'} onClick={() => { const next = new URLSearchParams(params); next.delete('tab'); setParams(next) }}>Обзор</button>
+      <button type="button" aria-pressed={tab === 'members'} onClick={() => { const next = new URLSearchParams(params); next.set('tab', 'members'); setParams(next) }}>Участники</button>
       <Link to={`/projects/${project.id}/summaries?team=${encodeURIComponent(team.id)}`}>Сводки</Link>
-      <button type="button" aria-pressed={tab === 'events'} onClick={() => setParams({ tab: 'events' })}>Лента событий</button>
+      <button type="button" aria-pressed={tab === 'events'} onClick={() => { const next = new URLSearchParams(params); next.set('tab', 'events'); setParams(next) }}>Лента событий</button>
       <Link to={`/projects/${project.id}/teams/${team.id}/report`}>Итоговый отчёт</Link>
     </div>
     {team.repository && <Card className="mb-5 p-4"><h2>Загрузка истории</h2>
@@ -289,13 +308,28 @@ function Team() {
     </Panel>}
     <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
       {tab === 'members' ? <CollectedMembers projectId={project.id} team={team} /> : <div className="space-y-5"><Panel title="События из GitHub">
+        <form key={JSON.stringify(filters)} aria-label="Фильтры событий" className="mb-4 grid gap-3 sm:grid-cols-2" onSubmit={event => {
+          event.preventDefault(); const data = new FormData(event.currentTarget), next = new URLSearchParams(params)
+          next.set('tab', 'events')
+          for (const key of ['kind', 'author', 'from', 'to']) { const value = String(data.get(key) ?? ''); if (value) next.set(key, value); else next.delete(key) }
+          setParams(next)
+        }}>
+          <label className="field">Тип события<select name="kind" defaultValue={filters.kind ?? ''}><option value="">Все типы</option>{Object.entries(eventLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+          <label className="field">Автор события<select name="author" defaultValue={filters.author ?? ''}><option value="">Все авторы</option><option value="unmatched">Неопознанные авторы</option>
+            {filters.author && filters.author !== 'unmatched' && !team.memberships.some(member => member.user.id === filters.author) && <option value={filters.author}>Выбранный автор вне текущего состава</option>}
+            {team.memberships.map(member => <option key={member.user.id} value={member.user.id}>{member.user.name ?? member.user.githubLogin}</option>)}</select></label>
+          <label className="field">С даты (UTC)<input name="from" type="date" defaultValue={filters.from ?? ''} /></label>
+          <label className="field">По дату (UTC)<input name="to" type="date" defaultValue={filters.to ?? ''} /></label>
+          <div className="flex flex-wrap gap-2 sm:col-span-2"><Button type="submit">Применить фильтры</Button><Button variant="outline" onClick={() => setParams({ tab: 'events' })}>Сбросить фильтры</Button></div>
+        </form>
+        <p className="mb-3 text-xs muted">Сначала новые события. Период включает выбранные даты по UTC.</p>
         {events.isPending && <Loading />}<ErrorText error={events.error} />
         {events.data?.pages.flatMap(page => page.events).map(event => <article key={event.id} className="border-b border-line py-3">
-          <div className="flex items-start justify-between gap-3"><a href={event.payload.url} target="_blank" rel="noreferrer">{event.payload.title}</a><Badge>{event.kind}</Badge></div>
+          <div className="flex items-start justify-between gap-3"><a className="min-w-0 break-words" href={event.payload.url} target="_blank" rel="noreferrer">{event.payload.title}</a><Badge>{eventLabels[event.kind]}</Badge></div>
           <p className="mt-1 text-xs muted">{event.author?.userId ? names.get(event.author.userId) ?? event.author.login : 'Автор не сопоставлен'} · {new Date(event.occurredAt).toLocaleString('ru-RU')}</p>
           {event.details?.stats && <p className="mt-1 text-xs">Изменено строк: +{event.details.stats.additions} / −{event.details.stats.deletions}</p>}
         </article>)}
-        {events.data?.pages[0]?.events.length === 0 && <p className="muted">Событий пока нет. Подключите репозиторий или дождитесь загрузки истории.</p>}
+        {events.data?.pages[0]?.events.length === 0 && <p className="muted">По выбранным условиям событий нет. Измените фильтры или дождитесь загрузки истории.</p>}
         {events.hasNextPage && <Button variant="outline" disabled={events.isFetchingNextPage} onClick={() => void events.fetchNextPage()}>Ещё события</Button>}
       </Panel><Panel title="Неопознанные авторы">
         <ErrorText error={unmatched.error} /><ErrorText error={claim.error} />
@@ -318,7 +352,7 @@ function Member() {
   if (member.isPending) return <Loading />
   if (member.isError) return <ErrorText error={member.error} />
   return <><PageHeader title={member.data.user.name ?? member.data.user.githubLogin} eyebrow={<Link to={`/projects/${projectId}/teams/${teamId}`}>← Команда</Link>} />
-    <Panel title="Собранная активность">{member.data.rawActivity.map(item => <p key={item.kind}>{item.kind}: {item.count}</p>)}
+    <Panel title="Собранная активность">{member.data.rawActivity.map(item => <p key={item.kind}>{eventLabels[item.kind]}: {item.count}</p>)}
       {!member.data.rawActivity.length && <p>Сопоставленных событий пока нет.</p>}<p className="mt-4 text-sm muted">Это число событий GitHub. Взвешенный вклад ещё не рассчитан.</p></Panel></>
 }
 function Invitation() {
@@ -347,6 +381,7 @@ export default function ApiApp() {
     <Route path="projects/:projectId/participants" element={<Protected><ProjectSection section="participants" /></Protected>} />
     <Route path="projects/:projectId/settings" element={<Protected><ProjectSection section="settings" /></Protected>} />
     <Route path="projects/:projectId/summaries" element={<Protected><ProjectSection section="summaries" /></Protected>} />
+    <Route path="projects/:projectId/audit" element={<Protected><ProjectSection section="audit" /></Protected>} />
     <Route path="projects/:projectId/teams/:teamId/report" element={<Protected><ProjectSection section="report" /></Protected>} />
     <Route path="projects/:projectId/teams/:teamId" element={<Protected><Team /></Protected>} />
     <Route path="projects/:projectId/teams/:teamId/members/:memberId" element={<Protected><Member /></Protected>} />

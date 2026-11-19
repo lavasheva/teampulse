@@ -3,7 +3,7 @@ import { Link, NavLink, useMatch } from 'react-router'
 import { Avatar, Brand } from './ui'
 import { paths } from '../routes'
 
-export interface NavigationProject { id: string; name: string; canManage: boolean; firstTeamId?: string; visible: boolean }
+export interface NavigationProject { id: string; name: string; canManage: boolean; firstTeamId?: string; visible: boolean; auditAvailable?: boolean }
 export function WorkspaceFrame({ projects, user, onLogout, loggingOut, allowCreate, children }: {
   projects: NavigationProject[]; user: { name: string; label: string }; onLogout: () => void
   loggingOut: boolean; allowCreate: boolean; children: ReactNode
@@ -26,6 +26,7 @@ export function WorkspaceFrame({ projects, user, onLogout, loggingOut, allowCrea
           <NavLink to={paths.summaries(project.id)}>Сводки</NavLink>
           <NavLink to={paths.participants(project.id)}>Участники</NavLink>
           {project.canManage && <NavLink to={paths.settings(project.id)}>Настройки</NavLink>}
+          {project.canManage && project.auditAvailable && <NavLink to={paths.audit(project.id)}>Журнал действий</NavLink>}
         </>}
       </nav>
       <div className="sidebar-profile">

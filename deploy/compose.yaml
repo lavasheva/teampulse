@@ -1,0 +1,92 @@
+x-api: &api
+  image: teampulse-api:${TEAMPULSE_IMAGE_TAG:-local}
+  build:
+    context: ..
+    dockerfile: deploy/api.Dockerfile
+  env_file: ${API_ENV_FILE:-.env}
+  environment:
+    NODE_ENV: production
+    HOST: 0.0.0.0
+    PORT: '3000'
+    TRUST_PROXY_HOPS: '1'
+    GITHUB_APP_PRIVATE_KEY_PATH: /run/secrets/github_app_key
+  secrets: [github_app_key]
+  networks: [private]
+  security_opt: [no-new-privileges:true]
+  logging: &logging
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: '3'
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-teampulse}
+      POSTGRES_USER: ${POSTGRES_USER:-teampulse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    networks: [private]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    logging: *logging
+  redis:
+    image: redis:7-alpine
+    command: [redis-server, --appendonly, 'yes', --maxmemory-policy, noeviction]
+    restart: unless-stopped
+    volumes: [redis_data:/data]
+    networks: [private]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    logging: *logging
+  migrate:
+    <<: *api
+    command: [node, node_modules/prisma/build/index.js, migrate, deploy]
+    restart: 'no'
+    healthcheck: {disable: true}
+    depends_on:
+      postgres: {condition: service_healthy}
+  api:
+    <<: *api
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 45s
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+  web:
+    image: teampulse-web:${TEAMPULSE_IMAGE_TAG:-local}
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?Set SITE_ADDRESS}
+    ports:
+      - '${HTTP_BIND:-0.0.0.0}:${HTTP_PORT:-80}:80'
+      - '${HTTP_BIND:-0.0.0.0}:${HTTPS_PORT:-443}:443'
+    volumes: [caddy_data:/data, caddy_config:/config]
+    networks: [private]
+    depends_on:
+      api: {condition: service_healthy}
+    logging: *logging
+
+networks:
+  private:
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
+secrets:
+  github_app_key:
+    file: ${GITHUB_APP_PRIVATE_KEY_FILE:?Set GITHUB_APP_PRIVATE_KEY_FILE}

@@ -62,4 +62,5 @@
 
 ## Подключение
 
-[План доводки](analytics-handoff.md) описывает подключение воркера и API, поля для экранов и сценарии приёмки перед защитой.
+- **Саша.** Добавить зависимость `@teampulse/analytics` воркеру. На границе с Prisma проверить JSON-поля `settings.weights`, `settings.thresholds`, `events.payload` и `events.details` и передать типизированный `WeeklyAnalyticsInput` из `AnalyticsInputService.week` в `analyticsEngine.calculate`. Пакет публикует локальный CommonJS-выход после `pnpm --filter @teampulse/analytics build`. Хранить результат с `sourceVersion` и `engineVersion`, сохраняя только актуальный снимок команды и недели. Для итогового `calculateProject` нужен снимок событий за весь проект с одним набором весов. Для длинного окна тишины передавать `historyStartsOn` с покрывающими событиями. При необходимости настроить провайдер сводки в воркере.
+- **Арина.** Для графиков брать `sharePercent` и `categoryShares` (0–100), `gini` (0–1), `activeDays` и `averageGapDays`. Флаги несут `unit`, `actual`, `threshold`, `period` и `evidenceEventIds`. В карточках показать причины из `adjustments`, ведя отдельно строки, где их количество неизвестно. В сводке показывать `text` и обозначать шаблон по `source`.

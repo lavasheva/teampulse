@@ -100,6 +100,18 @@ export interface WeeklyContributionResult extends ProjectContributionResult, Wee
   flags: ContributionFlag[]
 }
 
+export interface AnalyticsWeeklySummary {
+  teamId: string
+  weekStartsOn: string
+  sourceVersion: number
+  engineVersion: string
+  text: string
+  source: 'template' | 'ai'
+  provider?: string
+  fallbackReason?: 'empty' | 'provider_error' | 'invalid_response'
+  evidenceEventIds: string[]
+}
+
 export interface AnalyticsEngine {
   readonly version: string
   calculate(input: WeeklyAnalyticsInput): Promise<WeeklyAnalyticsResult>

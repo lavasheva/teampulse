@@ -8,6 +8,8 @@ import { contributionFlags } from './flags'
 import { asPeriod, dateStart, DAY, projectBounds } from './period'
 
 const version = '1.0.0'
+export { generateWeeklySummary, type SummaryProvider, type SummaryMessage } from './summary'
+export { createGigaChatProvider, createYandexGptProvider } from './providers'
 const categories: WorkKind[] = ['code', 'pullRequests', 'reviews', 'issues']
 const workValues = (calculate: (kind: WorkKind) => number): WorkValues => ({
   code: calculate('code'), pullRequests: calculate('pullRequests'), reviews: calculate('reviews'), issues: calculate('issues'),

@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
 export default defineConfig({
-  testDir: './e2e', testMatch: '**/api.e2e.ts', workers: 1, timeout: 90000,
+  testDir: './e2e', outputDir: './test-results/api', testMatch: '**/api.e2e.ts', workers: 1, timeout: 90000,
   expect: { timeout: 15000 },
   use: { ...devices['Desktop Chrome'], baseURL: 'http://127.0.0.1:4174', trace: 'retain-on-failure',
     ...(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : {}) },

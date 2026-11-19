@@ -1,7 +1,21 @@
-import type { Team } from '@teampulse/shared'
+import type { LiveProject, Team } from '@teampulse/shared'
 import { Link } from 'react-router'
 import { paths } from '../routes'
 import { Avatar, Meter, Panel } from './ui'
+
+export function CollectedMembers({ projectId, team }: { projectId: string; team: LiveProject['teams'][number] }) {
+  return <Panel title="Участники команды">
+    {team.memberships.length ? <div className="table-scroll"><table className="w-full min-w-[400px]">
+      <thead><tr><th scope="col">Участник</th><th scope="col">Роль</th><th scope="col">Доля вклада</th></tr></thead>
+      <tbody>{team.memberships.map(member => <tr key={member.user.id}>
+        <td><Link aria-label={member.user.name ?? member.user.githubLogin} className="flex items-center gap-2 text-ink" to={paths.member(projectId, team.id, member.user.id)}>
+          <Avatar name={member.user.name ?? member.user.githubLogin} /><span><strong className="block">{member.user.name ?? member.user.githubLogin}</strong><small className="muted">@{member.user.githubLogin}</small></span></Link></td>
+        <td>{member.role === 'observer' ? 'Наблюдатель' : 'Участник'}</td><td>—</td>
+      </tr>)}</tbody>
+    </table></div> : <p className="muted">В команде пока нет участников.</p>}
+    <p className="mt-3 text-sm muted">Доли вклада появятся после расчёта аналитики. Наблюдатели в расчёте не участвуют.</p>
+  </Panel>
+}
 
 export function Contributions({ projectId, team }: { projectId: string; team: Team }) {
   const members = [...team.members].sort((a, b) => b.share - a.share)

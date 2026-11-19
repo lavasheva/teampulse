@@ -44,9 +44,14 @@ export class WebhooksController {
     if (!payload.repositoryExternalId && !await this.prisma.repository.count({ where: {
       installationId: payload.installationId, provider: 'github',
     } })) return { accepted: false, ignored: true }
+    const connections = payload.disconnect ? await this.prisma.repository.findMany({ where: {
+      provider: 'github', installationId: payload.installationId,
+      ...(Array.isArray(payload.disconnect) ? { externalId: { in: payload.disconnect } } : {}),
+    }, select: { id: true, connectionVersion: true } }) : undefined
     try {
       await this.prisma.webhookDelivery.create({ data: { id: deliveryId, eventName: event, contentHash,
-        repositoryId: repository?.id, payload: payload as unknown as Prisma.InputJsonValue } })
+        repositoryId: repository?.id, repositoryVersion: repository?.connectionVersion,
+        payload: { ...payload, ...(connections ? { connections } : {}) } as unknown as Prisma.InputJsonValue } })
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const duplicate = await this.prisma.webhookDelivery.findUniqueOrThrow({ where: { id: deliveryId } })

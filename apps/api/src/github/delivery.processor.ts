@@ -13,15 +13,19 @@ export class DeliveryProcessor {
         await tx.$queryRaw`SELECT id FROM "WebhookDelivery" WHERE id = ${id} FOR UPDATE`
         const delivery = await tx.webhookDelivery.findUnique({ where: { id } })
         if (!delivery || delivery.status === 'complete' || delivery.status === 'failed') return
-        const data = delivery.payload as unknown as DeliveryPayload | null
+        const data = delivery.payload as unknown as (DeliveryPayload & { connections?: { id: string; connectionVersion: number }[] }) | null
         if (!data) throw new Error('Missing normalized delivery')
         if (data.disconnect) {
           await tx.repository.updateMany({ where: { provider: 'github', installationId: data.installationId,
+            ...(data.connections ? { OR: data.connections.map(connection => ({ id: connection.id, connectionVersion: connection.connectionVersion })) }
+              : { connectionVersion: delivery.repositoryVersion ?? 0 }),
             ...(Array.isArray(data.disconnect) ? { externalId: { in: data.disconnect } } : {}) },
-            data: { syncStatus: 'disconnected' } })
+            data: { syncStatus: 'disconnected', connectionVersion: { increment: 1 }, syncError: 'GITHUB_ACCESS_REVOKED',
+              syncLeaseToken: null, syncLeaseUntil: null, syncRetryAt: null, nextReconcileAt: null } })
         } else if (delivery.repositoryId) {
+          await tx.$queryRaw`SELECT id FROM "Repository" WHERE id = ${delivery.repositoryId}::uuid FOR UPDATE`
           const repository = await tx.repository.findFirst({ where: { id: delivery.repositoryId,
-            installationId: data.installationId, syncStatus: { not: 'disconnected' } } })
+            installationId: data.installationId, syncStatus: { not: 'disconnected' }, connectionVersion: delivery.repositoryVersion ?? 0 } })
           if (repository) await this.events.save(tx, repository, data.events)
         }
         await tx.webhookDelivery.update({ where: { id }, data: {

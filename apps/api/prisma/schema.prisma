@@ -193,6 +193,7 @@ model Repository {
   externalId      String
   fullName        String
   installationId  String
+  connectionVersion Int             @default(0)
   syncStatus      SyncStatus        @default(pending)
   syncCursor      String?
   syncedAt        DateTime?
@@ -277,6 +278,7 @@ model RecalculationRequest {
 model WebhookDelivery {
   id           String         @id
   repositoryId String?        @db.Uuid
+  repositoryVersion Int?
   repository   Repository?    @relation(fields: [repositoryId], references: [id], onDelete: SetNull)
   eventName    String
   status       DeliveryStatus @default(pending)

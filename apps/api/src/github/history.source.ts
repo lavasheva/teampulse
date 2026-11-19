@@ -38,6 +38,9 @@ export interface HistoryStep { cursor: HistoryCursor | null; events: CollectedEv
 export class GitHubRateLimit extends Error {
   constructor(readonly retryAt: Date) { super('GitHub rate limit') }
 }
+export class GitHubAccessError extends Error {
+  constructor() { super('GitHub repository access unavailable') }
+}
 
 export function rateLimitRetry(status: number | undefined, headers: Record<string, string | undefined>, now = Date.now()) {
   if (status !== 403 && status !== 429) return null
@@ -66,6 +69,7 @@ export class HistorySource {
       const retry = rateLimitRetry(failure.status === 403 && /rate limit/i.test(failure.message ?? '') ? 429 : failure.status,
         failure.response?.headers ?? {})
       if (retry) throw new GitHubRateLimit(retry)
+      if ([401, 403, 404].includes(failure.status ?? 0)) throw new GitHubAccessError()
       throw new Error('GitHub history request failed')
     }
   }

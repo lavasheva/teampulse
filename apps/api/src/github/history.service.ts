@@ -2,7 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { randomUUID } from 'node:crypto'
 import { PrismaService } from '../prisma.service'
 import { EventStore } from './event.store'
-import { GitHubRateLimit, HistorySource, type HistoryCursor } from './history.source'
+import { GitHubAccessError, GitHubRateLimit, HistorySource, type HistoryCursor } from './history.source'
 
 @Injectable()
 export class HistoryService {
@@ -65,12 +65,13 @@ export class HistoryService {
       }, { timeout: 60000 })
       return more
     } catch (error) {
-      const limited = error instanceof GitHubRateLimit
+      const limited = error instanceof GitHubRateLimit, denied = error instanceof GitHubAccessError
       const failures = repository.syncFailures + (limited ? 0 : 1)
       await this.prisma.repository.updateMany({ where: { id, syncLeaseToken: lease, syncStatus: 'running' }, data: {
-        syncStatus: failures >= 5 ? 'failed' : 'pending', syncFailures: failures,
-        syncError: limited ? 'GITHUB_RATE_LIMIT' : 'HISTORY_REQUEST_FAILED',
-        syncRetryAt: limited ? error.retryAt : new Date(Date.now() + Math.min(60000, 1000 * 2 ** failures)),
+        syncStatus: denied ? 'disconnected' : failures >= 5 ? 'failed' : 'pending', syncFailures: failures,
+        syncError: denied ? 'GITHUB_ACCESS_DENIED' : limited ? 'GITHUB_RATE_LIMIT' : 'HISTORY_REQUEST_FAILED',
+        ...(denied ? { connectionVersion: { increment: 1 }, nextReconcileAt: null } : {}),
+        syncRetryAt: denied || failures >= 5 ? null : limited ? error.retryAt : new Date(Date.now() + Math.min(60000, 1000 * 2 ** failures)),
         syncLeaseToken: null, syncLeaseUntil: null,
       } })
       return false

@@ -201,6 +201,8 @@ function Team() {
     initialPageParam: undefined as string | undefined, getNextPageParam: page => page.nextCursor ?? undefined, enabled: Boolean(team), refetchInterval: 15000 })
   const app = useQuery({ queryKey: ['api', 'app'], queryFn: api.app, enabled: Boolean(team?.canConnect) })
   const connect = useApiMutation((input: { fullName: string }) => api.connect(teamId, input))
+  const disconnect = useApiMutation(() => api.disconnect(teamId))
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false)
   const sync = useApiMutation(() => api.sync(teamId)), claim = useApiMutation((id: string) => api.claim(teamId, id))
   if (workspace.isPending) return <Loading />
   if (workspace.isError) return <ErrorText error={workspace.error} />
@@ -209,19 +211,32 @@ function Team() {
   return <>
     <PageHeader title={team.name} eyebrow={<Link to={`/projects/${project.id}`}>← {project.settings.name}</Link>}
       description={team.repository?.fullName ?? 'Подключите репозиторий команды'}
-      actions={team.repository && team.canConnect && <Button disabled={sync.isPending} onClick={() => sync.mutate()}>Обновить историю</Button>} />
+      actions={team.repository && team.repository.syncStatus !== 'disconnected' && team.canConnect && <Button disabled={sync.isPending} onClick={() => sync.mutate()}>Обновить историю</Button>} />
     <ErrorText error={sync.error} />
     {team.repository && <Card className="mb-5 p-4"><h2>Загрузка истории</h2>
-      <p className="mt-2 text-sm" role="status">{status.data ? `Статус: ${{ pending: 'в очереди', running: 'загружается', complete: 'завершена', failed: 'ошибка', disconnected: 'нет доступа GitHub' }[status.data.syncStatus]}. Событий: ${status.data._count.events}` : 'Проверяем состояние…'}</p>
+      <p className="mt-2 text-sm" role="status">{status.data ? `Статус: ${{ pending: 'в очереди', running: 'загружается', complete: 'завершена', failed: 'ошибка', disconnected: 'отключён' }[status.data.syncStatus]}. Событий: ${status.data._count.events}` : 'Проверяем состояние…'}</p>
+      {status.data?.syncError && <p className="mt-2 text-sm">{({ USER_DISCONNECTED: 'Сбор событий остановлен пользователем. Сохранённая история доступна ниже.',
+        GITHUB_ACCESS_REVOKED: 'GitHub отозвал доступ приложения. Восстановите установку и подключите репозиторий повторно.',
+        GITHUB_ACCESS_DENIED: 'Нет доступа к данным GitHub. Проверьте права и установку приложения, затем подключите репозиторий повторно.',
+        GITHUB_RATE_LIMIT: 'GitHub ограничил частоту запросов. Загрузка продолжится автоматически после паузы.',
+        HISTORY_REQUEST_FAILED: status.data.syncStatus === 'failed' ? 'Не удалось загрузить историю после нескольких попыток. Нажмите «Обновить историю», чтобы повторить.' : 'Временная ошибка загрузки. Повторим запрос автоматически.',
+      } as Record<string, string>)[status.data.syncError] ?? 'Не удалось обновить данные GitHub. Проверьте доступ к репозиторию.'}</p>}
       {status.data?.syncRetryAt && <p className="text-sm muted">Следующая попытка: {new Date(status.data.syncRetryAt).toLocaleString('ru-RU')}</p>}<ErrorText error={status.error} /></Card>}
-    {!team.repository && team.canConnect && <Panel title="Подключить GitHub" className="mb-5">
+    {team.repository && team.repository.syncStatus !== 'disconnected' && project.canManage && <Card className="mb-5 p-4">
+      {!confirmDisconnect ? <Button variant="outline" onClick={() => setConfirmDisconnect(true)}>Отключить репозиторий</Button> : <>
+        <p>Остановить сбор событий? История сохранится. Установка приложения на GitHub останется; здесь можно подключить тот же репозиторий повторно.</p>
+        <div className="mt-3 flex gap-3"><Button disabled={disconnect.isPending} onClick={() => disconnect.mutate(undefined, { onSuccess: () => setConfirmDisconnect(false) })}>Подтвердить отключение</Button>
+          <Button variant="outline" onClick={() => setConfirmDisconnect(false)}>Отмена</Button></div></>}
+      <ErrorText error={disconnect.error} /></Card>}
+    {(!team.repository || team.repository.syncStatus === 'disconnected') && team.canConnect && <Panel title={team.repository ? 'Восстановить подключение GitHub' : 'Подключить GitHub'} className="mb-5">
       {app.data?.installationUrl && <p className="mb-4"><a href={app.data.installationUrl} target="_blank" rel="noreferrer">Установить TeamPulse Insights на репозиторий →</a></p>}
       <form className="space-y-3" onSubmit={event => {
         event.preventDefault(); const data = new FormData(event.currentTarget)
         connect.mutate({ fullName: String(data.get('repo')) })
-      }}><label className="field">Репозиторий (владелец/название)<input name="repo" placeholder="lavasheva/teampulse" required /></label>
+      }}><label className="field">Репозиторий (владелец/название)<input name="repo" placeholder="lavasheva/teampulse" defaultValue={team.repository?.fullName} required /></label>
+        {team.repository && <p className="text-sm muted">Если репозиторий переименован, укажите новое название. Восстановить можно только тот же репозиторий — история не смешивается с другим источником.</p>}
         <p className="text-sm muted">Сначала установите приложение на выбранный репозиторий. Подключение подтверждает его администратор.</p>
-        <Button type="submit" disabled={connect.isPending}>Подключить репозиторий</Button><ErrorText error={connect.error} /></form>
+        <Button type="submit" disabled={connect.isPending}>{team.repository ? 'Подключить повторно' : 'Подключить репозиторий'}</Button><ErrorText error={connect.error} /></form>
     </Panel>}
     <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
       <div className="space-y-5"><Panel title="События из GitHub">

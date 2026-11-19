@@ -7,7 +7,7 @@ import { AppModule } from '../src/app.module'
 import { PrismaService } from '../src/prisma.service'
 import { configureApp } from '../src/setup'
 import { csrfToken, hash, token } from '../src/auth/security'
-import { HistorySource, GitHubRateLimit } from '../src/github/history.source'
+import { HistorySource, GitHubAccessError, GitHubRateLimit } from '../src/github/history.source'
 import { HistoryService } from '../src/github/history.service'
 import { EventStore, type CollectedEvent } from '../src/github/event.store'
 import { DeliveryProcessor } from '../src/github/delivery.processor'
@@ -225,5 +225,24 @@ describe('history checkpoints and author resolution on PostgreSQL', () => {
       expect((await prisma.repository.findUniqueOrThrow({ where: { id: repositoryId } })).syncStatus).toBe('complete')
       expect(await prisma.event.count({ where: { repositoryId } })).toBe(1)
     } finally { await queue.onModuleDestroy(); process.env.GITHUB_EVENTS_ENABLED = 'false' }
+  })
+  it('stops retrying when GitHub revokes access and invalidates the connection', async () => {
+    const prior = await prisma.repository.findUniqueOrThrow({ where: { id: repositoryId } })
+    source.next.mockRejectedValueOnce(new GitHubAccessError())
+    expect(await history.step(repositoryId)).toBe(false)
+    const repository = await prisma.repository.findUniqueOrThrow({ where: { id: repositoryId } })
+    expect(repository.syncStatus).toBe('disconnected'); expect(repository.syncError).toBe('GITHUB_ACCESS_DENIED')
+    expect(repository.syncRetryAt).toBeNull(); expect(repository.connectionVersion).toBe(prior.connectionVersion + 1)
+    await expect(history.request(teamId)).rejects.toThrow('Reconnect')
+  })
+  it('discards an in-flight history response after the connection lease is invalidated', async () => {
+    source.next.mockImplementationOnce(async () => {
+      await prisma.repository.update({ where: { id: repositoryId }, data: { syncStatus: 'disconnected',
+        syncLeaseToken: null, syncLeaseUntil: null, connectionVersion: { increment: 1 } } })
+      return { cursor: null, events: [event()] }
+    })
+    expect(await history.step(repositoryId)).toBe(false)
+    expect(await prisma.event.count({ where: { repositoryId } })).toBe(0)
+    expect((await prisma.repository.findUniqueOrThrow({ where: { id: repositoryId } })).syncStatus).toBe('disconnected')
   })
 })

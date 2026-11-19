@@ -1,5 +1,5 @@
 import type { Repository } from '@prisma/client'
-import { HistorySource, GitHubRateLimit, rateLimitRetry, type HistoryCursor } from '../src/github/history.source'
+import { HistorySource, GitHubAccessError, GitHubRateLimit, rateLimitRetry, type HistoryCursor } from '../src/github/history.source'
 import { GitHubAppClient } from '../src/github/app.client'
 import { weekStart } from '../src/github/event.store'
 
@@ -10,6 +10,14 @@ describe('resumable GitHub history source', () => {
   const source = new HistorySource({ installationClient: async () => ({ request }) } as unknown as GitHubAppClient)
   const enriched = jest.fn().mockResolvedValue(false)
   beforeEach(() => { request.mockReset(); enriched.mockReset().mockResolvedValue(false) })
+  it('distinguishes revoked access from rate limiting and temporary failures', async () => {
+    for (const status of [401, 403, 404]) {
+      request.mockRejectedValueOnce({ status })
+      await expect(source.next(repository, { stage: 'repository', anchor }, enriched)).rejects.toBeInstanceOf(GitHubAccessError)
+    }
+    request.mockRejectedValueOnce({ status: 503, message: 'upstream secret' })
+    await expect(source.next(repository, { stage: 'repository', anchor }, enriched)).rejects.toThrow('GitHub history request failed')
+  })
 
   it('honors primary/secondary rate limits and does not treat an ordinary 403 as rate limiting', async () => {
     const now = 100000

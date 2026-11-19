@@ -38,7 +38,12 @@ export class GitHubAppClient {
       const [owner, repo] = fullName.split('/')
       const installation = await app.octokit.request('GET /repos/{owner}/{repo}/installation', { owner, repo })
       return String(installation.data.id)
-    } catch { throw new ServiceUnavailableException('Install the GitHub App on this repository first') }
+    } catch (error) {
+      const status = (error as { status?: number }).status
+      throw new ServiceUnavailableException(status === 404
+        ? 'Установите TeamPulse Insights на этот репозиторий и проверьте его название.'
+        : 'GitHub временно недоступен или ограничил запросы. Попробуйте подключить репозиторий позже.')
+    }
   }
   async verifyRepository(installationId: string, fullName: string, githubId: string) {
     const appId = process.env.GITHUB_APP_ID, path = process.env.GITHUB_APP_PRIVATE_KEY_PATH
@@ -54,7 +59,7 @@ export class GitHubAppClient {
       if (installation.data.suspended_at || Object.values(installation.data.permissions).some(value => value === 'write')
         || !['contents', 'issues', 'pull_requests'].every(key =>
           (installation.data.permissions as Record<string, string>)[key] === 'read')) {
-        throw new ForbiddenException('GitHub App must have only read permissions for contents, issues and pull requests')
+        throw new ForbiddenException('Проверьте установку TeamPulse Insights: нужны только права чтения кода, issues и pull requests; установка не должна быть приостановлена.')
       }
       const octokit = await app.getInstallationOctokit(Number(installationId))
       const [owner, repo] = fullName.split('/')
@@ -62,11 +67,11 @@ export class GitHubAppClient {
       const admins = await octokit.paginate('GET /repos/{owner}/{repo}/collaborators', {
         owner, repo, permission: 'admin', per_page: 100,
       })
-      if (!admins.some(user => String(user.id) === githubId)) throw new ForbiddenException('Repository admin permission is required')
+      if (!admins.some(user => String(user.id) === githubId)) throw new ForbiddenException('Подключить репозиторий должен его администратор GitHub.')
       return { externalId: String(repository.data.id), fullName: repository.data.full_name }
     } catch (error) {
       if (error instanceof ForbiddenException) throw error
-      throw new ServiceUnavailableException('Could not verify GitHub App installation and repository access')
+      throw new ServiceUnavailableException('Не удалось проверить доступ GitHub. Проверьте установку TeamPulse Insights и доступ к репозиторию, затем повторите подключение.')
     }
   }
 }

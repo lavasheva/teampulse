@@ -28,6 +28,12 @@ test('real API: OAuth, project, invitation, signed event, authorship and logout'
   await page.getByRole('button', { name: 'Подключить репозиторий', exact: true }).click()
   await expect(page.getByText('Проверяем состояние…')).not.toBeVisible()
   await expect(page.getByRole('heading', { name: 'Загрузка истории', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Отключить репозиторий', exact: true }).click()
+    await page.getByRole('button', { name: 'Подтвердить отключение', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Восстановить подключение GitHub', exact: true })).toBeVisible()
+    await expect(page.getByText('Сбор событий остановлен пользователем. Сохранённая история доступна ниже.', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Подключить повторно', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Восстановить подключение GitHub', exact: true })).toHaveCount(0)
 
   const context = await browser.newContext()
   const student = await context.newPage()

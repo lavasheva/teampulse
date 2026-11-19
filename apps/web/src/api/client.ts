@@ -51,6 +51,7 @@ export const api = {
   accept: (token: string, teamId: string) => request<{ projectId: string; teamId: string }>(`/invitations/${id(token)}/accept`, 'POST', { teamId }),
   app: () => request<{ installationUrl: string | null }>('/github/app'),
   connect: (teamId: string, input: { fullName: string }) => request(`/teams/${id(teamId)}/repository`, 'POST', input),
+  disconnect: (teamId: string) => request<void>(`/teams/${id(teamId)}/repository`, 'DELETE'),
   syncStatus: (teamId: string) => request<RepositorySyncResponse>(`/teams/${id(teamId)}/repository/sync`),
   sync: (teamId: string) => request(`/teams/${id(teamId)}/repository/sync`, 'POST'),
   events: (teamId: string, cursor?: string) => request<CollectedEventsResponse>(`/teams/${id(teamId)}/events${cursor ? '?cursor=' + id(cursor) : ''}`),

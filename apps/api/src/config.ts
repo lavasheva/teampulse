@@ -1,4 +1,7 @@
 export function readConfig(env: NodeJS.ProcessEnv = process.env) {
+  if (env.TRUST_PROXY_HOPS !== undefined && !['0', '1'].includes(env.TRUST_PROXY_HOPS)) {
+    throw new Error('TRUST_PROXY_HOPS must be 0 or 1')
+  }
   const port = Number(env.PORT ?? 3000)
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error('PORT must be an integer between 1 and 65535')

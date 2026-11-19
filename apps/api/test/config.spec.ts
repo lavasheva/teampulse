@@ -20,4 +20,8 @@ describe('API configuration', () => {
     expect(readConfig({ ...env, NODE_ENV: 'production', WEB_ORIGIN: 'https://teampulse.example' }).origin)
       .toBe('https://teampulse.example')
   })
+  it('allows only an explicitly configured single proxy hop', () => {
+    expect(() => readConfig({ ...env, TRUST_PROXY_HOPS: '1' })).not.toThrow()
+    for (const value of ['true', '2', '-1']) expect(() => readConfig({ ...env, TRUST_PROXY_HOPS: value })).toThrow('TRUST_PROXY_HOPS')
+  })
 })

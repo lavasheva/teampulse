@@ -2,6 +2,8 @@ import { INestApplication, ValidationPipe } from '@nestjs/common'
 import { raw } from 'express'
 
 export function configureApp(app: INestApplication) {
+  // Enabled only for deployment behind the single private Caddy proxy.
+  if (process.env.TRUST_PROXY_HOPS === '1') app.getHttpAdapter().getInstance().set('trust proxy', 1)
   // Register before Nest's JSON parser: signatures are checked against the original bytes.
   app.use('/api/webhooks/github', raw({ type: 'application/json', limit: '2mb' }))
   app.setGlobalPrefix('api')

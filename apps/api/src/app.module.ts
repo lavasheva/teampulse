@@ -23,10 +23,11 @@ import { IdentitiesController } from './github/identities.controller'
 import { AnalyticsInputService } from './analytics/input.service'
 import { AccessService } from './workspace/access.service'
 import { AccessController } from './workspace/access.controller'
+import { ActivityController } from './workspace/activity.controller'
 
 @Module({
   imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }])],
-  controllers: [HealthController, AuthController, WorkspaceController, ClientController, WebhooksController, RepositoriesController, IdentitiesController, AccessController],
+  controllers: [HealthController, AuthController, WorkspaceController, ClientController, WebhooksController, RepositoriesController, IdentitiesController, AccessController, ActivityController],
   providers: [PrismaService, AuthService, GitHubClient, WorkspaceService, GitHubAppClient, DeliveryProcessor, EventsQueue,
     EventStore, HistorySource, HistoryService, ClientService, AnalyticsInputService, AccessService,
     { provide: APP_GUARD, useClass: ThrottlerGuard }, { provide: APP_GUARD, useClass: SessionGuard }],

@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma.service'
 import { hash, token } from '../auth/security'
 import { OrganizationInput, ProjectInput } from './dto'
 import { invalidateWeeks } from '../github/event.store'
+import { recordAudit } from './audit'
 
 const userSelect = { id: true, name: true, githubLogin: true, avatarUrl: true } as const
 
@@ -74,16 +75,21 @@ export class WorkspaceService {
     await this.requireManager(userId, projectId)
     const value = token()
     const expiresAt = new Date(Date.now() + 7 * 86400_000)
-    const invitation = await this.prisma.invitation.create({ data: { projectId, tokenHash: hash(value), expiresAt, role },
-      select: { id: true, expiresAt: true } })
+    const invitation = await this.prisma.$transaction(async tx => {
+      const invitation = await tx.invitation.create({ data: { projectId, tokenHash: hash(value), expiresAt, role }, select: { id: true, expiresAt: true } })
+      await recordAudit(tx, { projectId, actorId: userId, action: 'invitation_created', targetId: invitation.id, afterRole: role })
+      return invitation
+    })
     return { ...invitation, token: value }
   }
 
   async revokeInvitation(userId: string, projectId: string, id: string) {
     await this.requireManager(userId, projectId)
-    const result = await this.prisma.invitation.updateMany({ where: { id, projectId, revokedAt: null },
-      data: { revokedAt: new Date() } })
-    if (!result.count) throw new NotFoundException('Invitation not found')
+    await this.prisma.$transaction(async tx => {
+      const result = await tx.invitation.updateMany({ where: { id, projectId, revokedAt: null }, data: { revokedAt: new Date() } })
+      if (!result.count) throw new NotFoundException('Invitation not found')
+      await recordAudit(tx, { projectId, actorId: userId, action: 'invitation_revoked', targetId: id })
+    })
   }
 
   async invitation(value: string) {
@@ -114,6 +120,8 @@ export class WorkspaceService {
         if (existing && existing.teamId !== teamId) throw new ConflictException('Already a member of another team in this project')
         if (!existing) await tx.teamMembership.create({ data: { teamId, userId, projectId: invitation.projectId, role: invitation.role } })
         if (!existing) {
+          const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { githubLogin: true } })
+          await recordAudit(tx, { projectId: invitation.projectId, actorId: userId, action: 'member_joined', teamId, targetId: userId, subject: user.githubLogin, afterRole: invitation.role })
           const events = await tx.event.findMany({ where: { repository: { teamId } }, select: { occurredAt: true } })
           await invalidateWeeks(tx, teamId, events.map(event => event.occurredAt))
         }

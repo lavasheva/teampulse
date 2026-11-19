@@ -87,3 +87,15 @@ export interface ProjectAccessResponse {
   managers: ApiUser[]
   invitations: { id: string; role: 'participant' | 'observer'; createdAt: string; expiresAt: string }[]
 }
+
+export interface EventFilters {
+  kind?: CollectedEventResponse['kind']; author?: string; from?: string; to?: string
+}
+export type ProjectAuditAction = 'manager_added' | 'manager_removed' | 'member_role_changed' | 'member_removed' | 'member_joined'
+  | 'invitation_created' | 'invitation_revoked' | 'repository_connected' | 'repository_reconnected' | 'repository_disconnected'
+  | 'settings_updated' | 'identity_claimed'
+export interface ProjectAuditResponse {
+  entries: { id: string; createdAt: string; actorLogin: string | null; action: ProjectAuditAction; teamId: string | null
+    targetId: string | null; subject: string | null; beforeRole: string | null; afterRole: string | null }[]
+  nextCursor: string | null
+}

@@ -5,6 +5,7 @@ import type { AuthRequest } from '../auth/security'
 import { WorkspaceService } from '../workspace/workspace.service'
 import { PrismaService } from '../prisma.service'
 import { GitHubAppClient } from './app.client'
+import { recordAudit } from '../workspace/audit'
 
 class RepositoryInput {
   @IsOptional() @IsString() @Matches(/^[1-9][0-9]{0,14}$/) installationId?: string
@@ -35,6 +36,7 @@ export class RepositoriesController {
       await tx.repository.update({ where: { teamId }, data: { syncStatus: 'disconnected',
         connectionVersion: { increment: 1 }, syncError: 'USER_DISCONNECTED', syncRetryAt: null,
         syncLeaseToken: null, syncLeaseUntil: null, nextReconcileAt: null } })
+      await recordAudit(tx, { projectId: team.projectId, actorId: req.user.id, action: 'repository_disconnected', teamId, targetId: repository.id, subject: repository.fullName })
     })
   }
 
@@ -54,12 +56,14 @@ export class RepositoriesController {
         await tx.$queryRaw`SELECT id FROM "Repository" WHERE "teamId" = ${teamId}::uuid FOR UPDATE`
         const previous = await tx.repository.findUnique({ where: { teamId } })
         if (previous && previous.externalId !== verified.externalId) throw new ConflictException('Team already has a different repository')
-        return tx.repository.upsert({ where: { teamId },
+        const repository = await tx.repository.upsert({ where: { teamId },
           create: { teamId, ...verified, installationId },
           update: { fullName: verified.fullName, installationId, syncStatus: 'pending', connectionVersion: { increment: 1 },
             syncCursor: null, syncProcessed: 0, syncFailures: 0, syncError: null, syncRetryAt: null,
             syncLeaseToken: null, syncLeaseUntil: null, nextReconcileAt: null },
           select: { id: true, fullName: true, syncStatus: true } })
+        await recordAudit(tx, { projectId: team.projectId, actorId: req.user.id, action: previous ? 'repository_reconnected' : 'repository_connected', teamId, targetId: repository.id, subject: repository.fullName })
+        return repository
       })
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {

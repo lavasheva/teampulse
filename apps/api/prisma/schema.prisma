@@ -61,6 +61,7 @@ model User {
   identities      GitIdentity[]
   sessions        Session[]
   identityActions IdentityResolution[]
+  projectActions  ProjectAudit[]
 }
 
 model Session {
@@ -118,6 +119,7 @@ model Project {
   teams          Team[]
   milestones     Milestone[]
   invitations    Invitation[]
+  audit          ProjectAudit[]
 
   @@index([organizationId])
 }
@@ -247,7 +249,41 @@ model Event {
 
   @@unique([repositoryId, externalId])
   @@index([repositoryId, occurredAt])
+  @@index([repositoryId, occurredAt, id])
   @@index([authorId])
+}
+
+enum ProjectAction {
+  manager_added
+  manager_removed
+  member_role_changed
+  member_removed
+  member_joined
+  invitation_created
+  invitation_revoked
+  repository_connected
+  repository_reconnected
+  repository_disconnected
+  settings_updated
+  identity_claimed
+}
+
+model ProjectAudit {
+  id         String        @id @default(uuid()) @db.Uuid
+  projectId  String        @db.Uuid
+  project    Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actorId    String?       @db.Uuid
+  actor      User?         @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorLogin String?
+  action     ProjectAction
+  teamId     String?       @db.Uuid
+  targetId   String?
+  subject    String?
+  beforeRole String?
+  afterRole  String?
+  createdAt  DateTime      @default(now())
+
+  @@index([projectId, createdAt, id])
 }
 
 model IdentityResolution {

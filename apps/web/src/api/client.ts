@@ -1,6 +1,7 @@
 import type { AuthSessionResponse, CollectedEventsResponse, CreateOrganizationInput, CreateProjectInput,
   CreatedInvitationResponse, CreatedProjectResponse, InvitationResponse, LiveProjectSettings, LiveWorkspaceResponse,
   MemberActivityResponse, OrganizationResponse, ProjectAccessResponse, RepositorySyncResponse, UnmatchedIdentitiesResponse } from '@teampulse/shared'
+import type { EventFilters, ProjectAuditResponse } from '@teampulse/shared'
 
 export class ApiError extends Error {
   readonly status: number
@@ -54,7 +55,12 @@ export const api = {
   disconnect: (teamId: string) => request<void>(`/teams/${id(teamId)}/repository`, 'DELETE'),
   syncStatus: (teamId: string) => request<RepositorySyncResponse>(`/teams/${id(teamId)}/repository/sync`),
   sync: (teamId: string) => request(`/teams/${id(teamId)}/repository/sync`, 'POST'),
-  events: (teamId: string, cursor?: string) => request<CollectedEventsResponse>(`/teams/${id(teamId)}/events${cursor ? '?cursor=' + id(cursor) : ''}`),
+  events: (teamId: string, cursor?: string, filters: EventFilters = {}) => {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries({ ...filters, cursor })) if (value) params.set(key, value)
+    return request<CollectedEventsResponse>(`/teams/${id(teamId)}/activity?${params}`)
+  },
+  audit: (projectId: string, cursor?: string) => request<ProjectAuditResponse>(`/projects/${id(projectId)}/audit${cursor ? '?cursor=' + id(cursor) : ''}`),
   unmatched: (teamId: string, cursor?: string) => request<UnmatchedIdentitiesResponse>(`/teams/${id(teamId)}/identities/unmatched${cursor ? '?cursor=' + id(cursor) : ''}`),
   claim: (teamId: string, identityId: string) => request(`/teams/${id(teamId)}/identities/${id(identityId)}/claim`, 'POST'),
   member: (teamId: string, memberId: string) => request<MemberActivityResponse>(`/teams/${id(teamId)}/members/${id(memberId)}`),

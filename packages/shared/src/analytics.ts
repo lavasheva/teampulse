@@ -19,6 +19,8 @@ export interface ProjectAnalyticsInput {
 export interface WeeklyAnalyticsInput extends ProjectAnalyticsInput {
   weekStartsOn: string
   weekEndsBefore: string
+  /** Include events from this UTC date for inactivity lookback. */
+  historyStartsOn?: string
 }
 
 export interface AnalyticsPeriod { startsAt: string; endsBefore: string }
@@ -70,6 +72,7 @@ export interface ChangeAdjustment {
 }
 
 export interface ContributionFlag extends AnalyticsFlag {
+  teamId: string
   period: AnalyticsPeriod
   actual: number
   threshold: number

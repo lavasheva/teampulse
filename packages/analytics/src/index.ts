@@ -3,7 +3,8 @@ import type {
   WeeklyContributionResult, WorkKind, WorkValues,
 } from '@teampulse/shared'
 import { assessCommit, codeCredits } from './commits'
-import { actionCredit, periodEvents, type Credit } from './events'
+import { actionCredit, periodEvents, type Credit, type PeriodEvent } from './events'
+import { contributionFlags } from './flags'
 import { asPeriod, dateStart, DAY, projectBounds } from './period'
 
 const version = '1.0.0'
@@ -22,8 +23,17 @@ function gini(scores: number[], total: number): number {
   return numerator / ((sorted.length - 1) * total)
 }
 
-function calculate(input: ProjectAnalyticsInput, requestedStart: number, requestedEnd: number): ProjectContributionResult {
-  const [projectStart, projectEnd] = projectBounds(input)
+function scoreEvents(rows: PeriodEvent[]) {
+  const commits = rows.filter(row => row.event.kind === 'commit').map(row => ({ row, assessment: assessCommit(row) }))
+  const credits = [...rows.map(actionCredit).filter(credit => credit !== null), ...codeCredits(commits)]
+  return { commits, credits }
+}
+
+function calculate(input: ProjectAnalyticsInput, bounds: [number, number],
+  requestedStart: number, requestedEnd: number, historyStart?: number,
+  weekly = false,
+): ProjectContributionResult {
+  const [projectStart, projectEnd] = bounds
   const cutoff = input.asOf === undefined ? requestedEnd : Date.parse(input.asOf)
   if (!Number.isFinite(cutoff) || (input.asOf !== undefined && !/(Z|[+-]\d{2}:\d{2})$/i.test(input.asOf))) {
     throw new RangeError('Expected an ISO timestamp with timezone for asOf')
@@ -32,10 +42,10 @@ function calculate(input: ProjectAnalyticsInput, requestedStart: number, request
   const end = Math.min(requestedEnd, projectEnd, cutoff)
   const period = start < end ? asPeriod(start, end) : null
   const userIds = [...new Set(input.members.map(member => member.id))].sort()
-  const rows = periodEvents(input.events, new Set(userIds), start, end)
-  const commits = rows.filter(row => row.event.kind === 'commit').map(row => ({ row, assessment: assessCommit(row) }))
+  const roster = new Set(userIds)
+  const rows = periodEvents(input.events, roster, start, end)
+  const { commits, credits } = scoreEvents(rows)
   const creditsByUser = new Map(userIds.map(id => [id, [] as Credit[]]))
-  const credits = [...rows.map(actionCredit).filter(credit => credit !== null), ...codeCredits(commits)]
   for (const credit of credits) creditsByUser.get(credit.userId)!.push(credit)
 
   const changeCounts = new Map(userIds.map(id => [id, { measuredChanges: 0, excludedChanges: 0 }]))
@@ -77,13 +87,23 @@ function calculate(input: ProjectAnalyticsInput, requestedStart: number, request
   }
   for (const { event } of rows) eventCounts[event.kind]++
   const unknown = rows.filter(row => row.userId === null)
-  return {
+  const result: ProjectContributionResult = {
     engineVersion: version, teamId: input.teamId, projectId: input.projectId, sourceVersion: input.sourceVersion,
     period, members, flags: [], totalPoints: weightedTotal / 2000, gini: gini(perMember.map(member => member.weighted), weightedTotal),
     eventCounts, unknownAuthors: { count: unknown.length, eventIds: unknown.map(row => row.event.id) },
     adjustments: commits.flatMap(commit => commit.assessment.adjustments),
     commitsWithIncompleteStats: commits.filter(commit => commit.assessment.incomplete).map(commit => commit.row.event.id),
   }
+  const coverageStart = Math.max(projectStart, Math.min(historyStart ?? start, start))
+  const prior = period && coverageStart < start ? periodEvents(input.events, roster, coverageStart, start) : []
+  for (const credit of scoreEvents(prior).credits) creditsByUser.get(credit.userId)!.push(credit)
+  for (const memberCredits of creditsByUser.values()) memberCredits.sort((a, b) => a.timestamp - b.timestamp)
+  result.flags = contributionFlags(result, input.settings, {
+    coverageStart, start, end, knownCredits: creditsByUser,
+    latestUnknown: unknown.at(-1) ?? prior.findLast(row => row.userId === null),
+    useWeekEnd: weekly && end === requestedEnd,
+  })
+  return result
 }
 
 export function calculateWeek(input: WeeklyAnalyticsInput): WeeklyContributionResult {
@@ -92,11 +112,13 @@ export function calculateWeek(input: WeeklyAnalyticsInput): WeeklyContributionRe
   if (new Date(start).getUTCDay() !== 1 || end !== start + 7 * DAY) {
     throw new RangeError('Expected Monday to Monday UTC dates')
   }
-  return { ...calculate(input, start, end), weekStartsOn: input.weekStartsOn }
+  const history = input.historyStartsOn === undefined ? undefined : dateStart(input.historyStartsOn)
+  return { ...calculate(input, projectBounds(input), start, end, history, true), weekStartsOn: input.weekStartsOn }
 }
 
 export function calculateProject(input: ProjectAnalyticsInput): ProjectContributionResult {
-  return calculate(input, ...projectBounds(input))
+  const bounds = projectBounds(input)
+  return calculate(input, bounds, ...bounds)
 }
 
 export const analyticsEngine = {

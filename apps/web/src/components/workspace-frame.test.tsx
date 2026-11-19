@@ -18,13 +18,13 @@ function show(projectId: string) {
 describe('project-scoped navigation', () => {
   it('does not grant settings in an observed project just because another project is managed', () => {
     show('observed')
-    expect(screen.queryByRole('link', { name: 'Настройки', exact: true })).toBeNull()
-    expect(screen.getByRole('link', { name: 'Наблюдаемый проект', exact: true }).getAttribute('href')).toBe('/projects/observed/teams/my-team')
-    expect(screen.getByRole('link', { name: 'Участники', exact: true }).getAttribute('href')).toBe('/projects/observed/participants')
+    expect(screen.queryByRole('link', { name: 'Настройки' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Наблюдаемый проект' }).getAttribute('href')).toBe('/projects/observed/teams/my-team')
+    expect(screen.getByRole('link', { name: 'Участники' }).getAttribute('href')).toBe('/projects/observed/participants')
   })
   it('offers settings for the current managed project and preserves its route', () => {
     show('managed')
-    expect(screen.getByRole('link', { name: 'Настройки', exact: true }).getAttribute('href')).toBe('/projects/managed/settings')
-    expect(screen.getByRole('link', { name: 'Сводки', exact: true }).getAttribute('href')).toBe('/projects/managed/summaries')
+    expect(screen.getByRole('link', { name: 'Настройки' }).getAttribute('href')).toBe('/projects/managed/settings')
+    expect(screen.getByRole('link', { name: 'Сводки' }).getAttribute('href')).toBe('/projects/managed/summaries')
   })
 })

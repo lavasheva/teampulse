@@ -1,8 +1,20 @@
-import type { Team } from '@teampulse/shared'
+import type { LiveProject, Team } from '@teampulse/shared'
 import { Link } from 'react-router'
 import { formatDay, formatNumber, healthLabels, teamHealth } from '../data/presentation'
 import { paths } from '../routes'
 import { Badge, Card } from './ui'
+
+export function CollectedTeamCard({ projectId, team }: { projectId: string; team: LiveProject['teams'][number] }) {
+  return <Link aria-label={team.name} className="block text-ink no-underline hover:no-underline" to={paths.team(projectId, team.id)}>
+    <Card className="team-card h-full">
+      <div className="flex flex-wrap justify-between gap-2"><h2>{team.name}</h2><Badge>Ожидает расчёта</Badge></div>
+      <p className="mb-3 break-words text-xs muted">{team.repository?.fullName ?? 'Репозиторий не подключён'}</p>
+      <p className="text-sm">Участников: {team.memberships.filter(member => member.role === 'participant').length}</p>
+      <p className="text-sm muted">Наблюдателей: {team.memberships.filter(member => member.role === 'observer').length}</p>
+      <div className="mt-3 border-t border-line pt-2 text-xs muted">Собрано событий: {team.repository?._count.events ?? 0}</div>
+    </Card>
+  </Link>
+}
 
 export function ProjectTeamCard({ projectId, team }: { projectId: string; team: Team }) {
   const health = healthLabels[teamHealth(team)]

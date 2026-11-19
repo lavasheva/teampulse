@@ -1,10 +1,13 @@
 import { useState, type ReactNode } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router'
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import type { LiveProject, LiveProjectSettings } from '@teampulse/shared'
 import { Badge, Brand, Button, Card, EmptyState, PageHeader, Panel } from '../components/ui'
 import { api } from './client'
 import { sessionKey, useApiMutation, useLiveWorkspace, useSession } from './hooks'
+import { WorkspaceFrame } from '../components/workspace-frame'
+import { CollectedTeamCard } from '../components/project-team-card'
+import { CollectedMembers } from '../components/contributions'
 
 function ErrorText({ error }: { error: unknown }) {
   return error ? <p role="alert" className="mt-3 text-sm">{error instanceof Error ? error.message : 'Не удалось выполнить запрос.'}</p> : null
@@ -27,26 +30,36 @@ function Home() {
 }
 function Shell({ children }: { children: ReactNode }) {
   const session = useSession(), queries = useQueryClient()
+  const workspace = useLiveWorkspace()
   const logout = useMutation({ mutationFn: async () => {
     await api.logout()
     await queries.cancelQueries({ queryKey: ['api'] })
     queries.setQueryData(sessionKey, null)
     queries.removeQueries({ predicate: query => query.queryKey[0] === 'api' && query.queryKey[1] !== 'session' })
   } })
-  return <div className="min-h-screen bg-canvas">
-    <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line bg-white px-6 py-4">
-      <Link to="/projects"><Brand /></Link>
-      <div className="flex items-center gap-4 text-sm"><span>{session.data?.user.name ?? session.data?.user.githubLogin}</span>
-        {session.data && <Button variant="outline" disabled={logout.isPending} onClick={() => logout.mutate()}>Выйти</Button>}</div>
-    </header>
-    <main className="mx-auto max-w-6xl p-5 md:p-8">{children}<ErrorText error={logout.error} /></main>
+  return session.data ? <WorkspaceFrame
+    projects={(workspace.data?.projects ?? []).map(project => ({ id: project.id, name: project.settings.name,
+      canManage: project.canManage, firstTeamId: project.teams[0]?.id, visible: true }))}
+    user={{ name: session.data.user.name ?? session.data.user.githubLogin, label: 'Аккаунт GitHub' }}
+    allowCreate={Boolean(workspace.data?.organizations.length)} loggingOut={logout.isPending} onLogout={() => logout.mutate()}
+  >{children}<ErrorText error={logout.error} /></WorkspaceFrame> : <>{children}</>
+}
+function Login({ invitation = false, error }: { invitation?: boolean; error?: unknown }) {
+  return <div className="login-screen">
+    <div className="login-intro"><Brand inverse /><div><h1>Активность команды —<br />из вашего GitHub</h1>
+      <ul><li>✓ Проекты, команды и приглашения</li><li>✓ История коммитов, PR, ревью и задач</li><li>✓ Сопоставление авторов и доступ по ролям</li></ul>
+    </div><p>Расчёты вклада и ИИ-сводки — следующий этап</p></div>
+    <main className="login-main"><Card className="login-card"><h2>{invitation ? 'Приглашение в команду' : 'Вход в TeamPulse'}</h2>
+      <p>{invitation ? 'Войдите через GitHub, чтобы выбрать команду.' : 'Войдите через GitHub, чтобы открыть свои проекты и команды.'}</p><LoginButton /><ErrorText error={error} />
+      <div className="login-note"><p>Доступ определяется вашими правами в проекте.</p></div>
+    </Card></main>
   </div>
 }
 function Protected({ children }: { children: ReactNode }) {
   const session = useSession()
   if (session.isPending) return <Loading />
   if (session.isError) return <EmptyState title="Не удалось проверить вход"><ErrorText error={session.error} /><Button onClick={() => void session.refetch()}>Повторить</Button></EmptyState>
-  if (!session.data) return <EmptyState title="Вход в TeamPulse"><p className="mb-4">Войдите через GitHub, чтобы открыть свои проекты и команды.</p><LoginButton /></EmptyState>
+  if (!session.data) return <Login />
   return children
 }
 function Projects() {
@@ -102,20 +115,39 @@ function Project() {
         setInvitation(`${window.location.origin}/invite/${result.token}`) })}>Создать приглашение</Button>} />
     {invitation && <Card className="mb-4 p-4"><label className="field">Ссылка приглашения (действует 7 дней)<input readOnly value={invitation} onFocus={e => e.currentTarget.select()} /></label></Card>}
     <ErrorText error={invite.error} />
-    <div className="grid gap-4 md:grid-cols-2">{project.teams.map(team => <Card key={team.id} className="p-5">
-      <Link className="font-semibold" to={`/projects/${project.id}/teams/${team.id}`}>{team.name}</Link>
-      <p className="mt-2 text-sm muted">Участников: {team.memberships.length} · {team.repository?.fullName ?? 'Репозиторий не подключён'}</p>
-      <p className="text-sm">Собрано событий: {team.repository?._count.events ?? 0}</p>
-    </Card>)}</div>
+    <div className="mb-5 grid grid-cols-2 gap-3 xl:grid-cols-4">{[
+      { label: 'Команды', value: project.teams.length },
+      { label: 'Участники', value: project.teams.reduce((sum, team) => sum + team.memberships.filter(member => member.role === 'participant').length, 0) },
+      { label: 'Собрано событий', value: project.teams.reduce((sum, team) => sum + (team.repository?._count.events ?? 0), 0) },
+      { label: 'Равномерность вклада', value: '—' },
+    ].map(stat => <Card key={stat.label} className="p-4"><p className="text-xs muted">{stat.label}</p><strong className="block py-1 text-[27px]">{stat.value}</strong></Card>)}</div>
+    <div className="grid gap-3 lg:grid-cols-2" aria-label="Команды проекта">{project.teams.map(team => <CollectedTeamCard key={team.id} projectId={project.id} team={team} />)}</div>
     <Card className="mt-5 p-5"><h2>Вклад ещё не рассчитан</h2><p className="mt-2 text-sm muted">Собранные события доступны на странице команды. Доли вклада, флаги и сводки появятся после расчёта.</p></Card>
     {project.canManage && <>
       <Panel title="Добавить команду" className="mt-5"><form className="flex flex-wrap items-end gap-3" onSubmit={event => {
         event.preventDefault(); const form = event.currentTarget
         createTeam.mutate(String(new FormData(form).get('name')), { onSuccess: () => form.reset() })
       }}><label className="field">Название команды<input name="name" required maxLength={120} /></label><Button type="submit" disabled={createTeam.isPending}>Добавить команду</Button><ErrorText error={createTeam.error} /></form></Panel>
-      <Settings key={project.id} project={project} />
-      <Access project={project} />
     </>}
+  </>
+}
+function ProjectSection({ section }: { section: 'participants' | 'settings' | 'summaries' | 'report' }) {
+  const { projectId, teamId } = useParams(), workspace = useLiveWorkspace()
+  if (workspace.isPending) return <Loading />
+  if (workspace.isError) return <ErrorText error={workspace.error} />
+  const project = workspace.data.projects.find(item => item.id === projectId)
+  if (!project || (teamId && !project.teams.some(team => team.id === teamId))) return <EmptyState title="Проект недоступен"><Link to="/projects">Мои проекты</Link></EmptyState>
+  if (section === 'settings' && !project.canManage) return <EmptyState title="Настройки недоступны"><p>Изменять настройки может руководитель проекта.</p></EmptyState>
+  const title = { participants: 'Участники', settings: 'Настройки', summaries: 'Сводки', report: 'Итоговый отчёт' }[section]
+  return <><PageHeader title={title} eyebrow={<Link to={`/projects/${project.id}`}>{project.settings.name}</Link>} />
+    {section === 'settings' ? <Settings key={project.id} project={project} />
+      : section === 'participants' ? <div className="space-y-5">
+        {project.teams.map(team => <section key={team.id}><h2 className="mb-3"><Link to={`/projects/${project.id}/teams/${team.id}`}>{team.name}</Link></h2><CollectedMembers projectId={project.id} team={team} /></section>)}
+        {project.canManage && <Access project={project} />}
+      </div> : <EmptyState title={section === 'report' ? 'Отчёт ещё не сформирован' : 'Сводки ещё не рассчитаны'}>
+        <p className="my-3 muted">События GitHub уже доступны. Метрики вклада, флаги и текстовые сводки появятся после подключения аналитического модуля.</p>
+        <Link to={`/projects/${project.id}`}>Перейти к командам и событиям</Link>
+      </EmptyState>}
   </>
 }
 function Access({ project }: { project: LiveProject }) {
@@ -187,12 +219,22 @@ function Settings({ project }: { project: LiveProject }) {
     <fieldset className="grid grid-cols-2 gap-3 md:grid-cols-4"><legend>Веса видов работы, %</legend>{Object.entries({ code: 'Код', pullRequests: 'Pull requests', reviews: 'Ревью', issues: 'Задачи' }).map(([key, label]) => <label className="field" key={key}>{label}
       <input type="number" min={0} max={100} required value={settings.weights[key as keyof typeof settings.weights]} onChange={e => setSettings({ ...settings, weights: { ...settings.weights, [key]: Number(e.target.value) } })} /></label>)}</fieldset>
     <p className="text-sm muted">Сумма весов должна быть 100%. Настройки применятся при следующем расчёте вкладов.</p>
+    <fieldset className="grid gap-3 md:grid-cols-2"><legend className="mb-2">Пороги флагов</legend>{Object.entries({ inactivity: 'Неактивность, дней', imbalance: 'Дисбаланс, %', lateBurst: 'Поздний всплеск, %', excluded: 'Исключённые изменения, %' }).map(([key, label]) =>
+      <label className="field" key={key}>{label}<input type="number" min={1} max={key === 'inactivity' ? 365 : 100} required value={settings.thresholds[key as keyof typeof settings.thresholds]}
+        onChange={event => setSettings({ ...settings, thresholds: { ...settings.thresholds, [key]: Number(event.target.value) } })} /></label>)}</fieldset>
+    <fieldset className="space-y-3"><legend>Контрольные точки</legend>{settings.milestones.map((point, index) => <div key={point.id} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+      <label className="field">Название точки {index + 1}<input required maxLength={120} value={point.title} onChange={event => setSettings({ ...settings, milestones: settings.milestones.map(item => item.id === point.id ? { ...item, title: event.target.value } : item) })} /></label>
+      <label className="field">Дата точки {index + 1}<input type="date" required min={settings.startsOn} max={settings.endsOn} value={point.date} onChange={event => setSettings({ ...settings, milestones: settings.milestones.map(item => item.id === point.id ? { ...item, date: event.target.value } : item) })} /></label>
+      <Button variant="ghost" aria-label={`Удалить точку ${index + 1}`} onClick={() => setSettings({ ...settings, milestones: settings.milestones.filter(item => item.id !== point.id) })}>×</Button>
+    </div>)}<Button variant="outline" disabled={settings.milestones.length >= 50} onClick={() => setSettings({ ...settings, milestones: [...settings.milestones, { id: crypto.randomUUID(), title: '', date: settings.endsOn }] })}>+ Добавить точку</Button></fieldset>
     <Button type="submit" disabled={save.isPending}>Сохранить настройки</Button><ErrorText error={save.error} />
     {save.isSuccess && <p role="status" className="text-sm">Настройки сохранены.</p>}
   </form></Panel>
 }
 function Team() {
   const { projectId, teamId = '' } = useParams(), workspace = useLiveWorkspace()
+  const [params, setParams] = useSearchParams()
+  const tab = ['overview', 'members', 'events'].includes(params.get('tab') ?? '') ? params.get('tab')! : 'overview'
   const project = workspace.data?.projects.find(p => p.id === projectId), team = project?.teams.find(t => t.id === teamId)
   const status = useQuery({ queryKey: ['api', 'sync', teamId], queryFn: () => api.syncStatus(teamId), enabled: Boolean(team?.repository), refetchInterval: 5000 })
   const events = useInfiniteQuery({ queryKey: ['api', 'events', teamId], queryFn: ({ pageParam }) => api.events(teamId, pageParam),
@@ -213,6 +255,13 @@ function Team() {
       description={team.repository?.fullName ?? 'Подключите репозиторий команды'}
       actions={team.repository && team.repository.syncStatus !== 'disconnected' && team.canConnect && <Button disabled={sync.isPending} onClick={() => sync.mutate()}>Обновить историю</Button>} />
     <ErrorText error={sync.error} />
+    <div className="page-tabs" aria-label="Раздел команды">
+      <button type="button" aria-pressed={tab === 'overview'} onClick={() => setParams({})}>Обзор</button>
+      <button type="button" aria-pressed={tab === 'members'} onClick={() => setParams({ tab: 'members' })}>Участники</button>
+      <Link to={`/projects/${project.id}/summaries?team=${encodeURIComponent(team.id)}`}>Сводки</Link>
+      <button type="button" aria-pressed={tab === 'events'} onClick={() => setParams({ tab: 'events' })}>Лента событий</button>
+      <Link to={`/projects/${project.id}/teams/${team.id}/report`}>Итоговый отчёт</Link>
+    </div>
     {team.repository && <Card className="mb-5 p-4"><h2>Загрузка истории</h2>
       <p className="mt-2 text-sm" role="status">{status.data ? `Статус: ${{ pending: 'в очереди', running: 'загружается', complete: 'завершена', failed: 'ошибка', disconnected: 'отключён' }[status.data.syncStatus]}. Событий: ${status.data._count.events}` : 'Проверяем состояние…'}</p>
       {status.data?.syncError && <p className="mt-2 text-sm">{({ USER_DISCONNECTED: 'Сбор событий остановлен пользователем. Сохранённая история доступна ниже.',
@@ -239,7 +288,7 @@ function Team() {
         <Button type="submit" disabled={connect.isPending}>{team.repository ? 'Подключить повторно' : 'Подключить репозиторий'}</Button><ErrorText error={connect.error} /></form>
     </Panel>}
     <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
-      <div className="space-y-5"><Panel title="События из GitHub">
+      {tab === 'members' ? <CollectedMembers projectId={project.id} team={team} /> : <div className="space-y-5"><Panel title="События из GitHub">
         {events.isPending && <Loading />}<ErrorText error={events.error} />
         {events.data?.pages.flatMap(page => page.events).map(event => <article key={event.id} className="border-b border-line py-3">
           <div className="flex items-start justify-between gap-3"><a href={event.payload.url} target="_blank" rel="noreferrer">{event.payload.title}</a><Badge>{event.kind}</Badge></div>
@@ -256,7 +305,7 @@ function Team() {
         </div>)}
         {unmatched.data?.pages[0]?.identities.length === 0 && <p className="muted">Неопознанных авторов нет.</p>}
         {unmatched.hasNextPage && <Button variant="outline" onClick={() => void unmatched.fetchNextPage()}>Ещё авторы</Button>}
-      </Panel></div>
+      </Panel></div>}
       <aside className="space-y-5"><Panel title="Участники">{team.memberships.map(member => <p key={member.user.id} className="mb-3 text-sm"><Link to={`/projects/${project.id}/teams/${team.id}/members/${member.user.id}`}>{member.user.name ?? member.user.githubLogin}</Link><br /><span className="muted">{member.role === 'observer' ? 'Наблюдатель' : 'Участник'}</span></p>)}
         {!team.memberships.length && <p className="muted">Пригласите участников в команду.</p>}
       </Panel><Panel title="Вклад ещё не рассчитан"><p className="text-sm muted">Здесь пока показаны собранные события и статистика GitHub. Доли вклада, флаги и сводки появятся после расчёта.</p></Panel></aside>
@@ -278,7 +327,7 @@ function Invitation() {
   const invitation = useQuery({ queryKey: ['api', 'invitation', code], queryFn: () => api.invitation(code), enabled: Boolean(session.data), retry: false })
   const accept = useApiMutation((teamId: string) => api.accept(code, teamId))
   if (session.isPending) return <Loading />
-  if (!session.data) return <EmptyState title="Приглашение в команду"><p className="mb-4">Войдите через GitHub, чтобы выбрать команду.</p><LoginButton /><ErrorText error={session.error} /></EmptyState>
+  if (!session.data) return <Login invitation error={session.error} />
   if (invitation.isPending) return <Loading />
   if (invitation.isError) return <EmptyState title="Приглашение недоступно"><ErrorText error={invitation.error} /><Link to="/projects">Мои проекты</Link></EmptyState>
   return <Panel title={`Приглашение: ${invitation.data.project.name}`}><form className="space-y-4" onSubmit={event => {
@@ -295,6 +344,10 @@ export default function ApiApp() {
     <Route path="invite/:code" element={<Invitation />} />
     <Route path="projects" element={<Protected><Projects /></Protected>} />
     <Route path="projects/:projectId" element={<Protected><Project /></Protected>} />
+    <Route path="projects/:projectId/participants" element={<Protected><ProjectSection section="participants" /></Protected>} />
+    <Route path="projects/:projectId/settings" element={<Protected><ProjectSection section="settings" /></Protected>} />
+    <Route path="projects/:projectId/summaries" element={<Protected><ProjectSection section="summaries" /></Protected>} />
+    <Route path="projects/:projectId/teams/:teamId/report" element={<Protected><ProjectSection section="report" /></Protected>} />
     <Route path="projects/:projectId/teams/:teamId" element={<Protected><Team /></Protected>} />
     <Route path="projects/:projectId/teams/:teamId/members/:memberId" element={<Protected><Member /></Protected>} />
     <Route path="*" element={<EmptyState title="Страница не найдена"><Link to="/projects">Мои проекты</Link></EmptyState>} />

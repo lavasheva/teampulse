@@ -52,6 +52,9 @@ async function verify(file) {
   const expected = (await fsp.readFile(file + '.sha256', 'utf8')).trim()
   if (!/^[a-f0-9]{64}$/.test(expected) || await digest(file) !== expected) throw new Error('Backup checksum mismatch')
   const name = `teampulse-restore-check-${randomUUID()}`
+  // The Docker entrypoint starts a socket-only server during initialization.
+  // Wait for the final server on loopback inside the isolated container.
+  const connection = ['-h', '127.0.0.1', '-U', 'postgres']
   let created = false
   try {
     await run('docker', ['run', '-d', '--name', name, '--network', 'none', '--label', 'teampulse.restore-check=true',
@@ -59,15 +62,15 @@ async function verify(file) {
     created = true
     let ready = false
     for (let attempt = 0; attempt < 60; attempt++) {
-      try { await run('docker', ['exec', name, 'pg_isready', '-U', 'postgres']); ready = true; break }
+      try { await run('docker', ['exec', name, 'pg_isready', ...connection]); ready = true; break }
       catch { await new Promise(resolve => setTimeout(resolve, 1000)) }
     }
     if (!ready) throw new Error('Temporary PostgreSQL did not start')
     await run('docker', ['cp', file, `${name}:/tmp/backup.dump`])
-    await run('docker', ['exec', name, 'createdb', '-U', 'postgres', 'teampulse_restore_test'])
-    await run('docker', ['exec', name, 'pg_restore', '-U', 'postgres', '-d', 'teampulse_restore_test',
+    await run('docker', ['exec', name, 'createdb', ...connection, 'teampulse_restore_test'])
+    await run('docker', ['exec', name, 'pg_restore', ...connection, '-d', 'teampulse_restore_test',
       '--exit-on-error', '--single-transaction', '--no-owner', '--no-acl', '/tmp/backup.dump'])
-    const result = await run('docker', ['exec', name, 'psql', '-U', 'postgres', '-d', 'teampulse_restore_test', '-At', '-v', 'ON_ERROR_STOP=1', '-c',
+    const result = await run('docker', ['exec', name, 'psql', ...connection, '-d', 'teampulse_restore_test', '-At', '-v', 'ON_ERROR_STOP=1', '-c',
       'SELECT json_build_object(\'migrations\',(SELECT count(*) FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL),\'organizations\',(SELECT count(*) FROM "Organization"),\'users\',(SELECT count(*) FROM "User"),\'events\',(SELECT count(*) FROM "Event"));'])
     return JSON.parse(result)
   } finally {

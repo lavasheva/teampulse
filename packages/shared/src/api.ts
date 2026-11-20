@@ -69,16 +69,16 @@ export interface LiveProjectSettings {
 }
 export interface LiveProject {
   id: string; organization: OrganizationResponse; canManage: boolean; settings: LiveProjectSettings
-  teams: { id: string; name: string; canConnect: boolean
+  teams: { id: string; name: string; canConnect: boolean; analytics?: TeamAnalyticsOverview
     memberships: { role: 'participant' | 'observer'; user: ApiUser }[]
     repository: { fullName: string; syncStatus: RepositorySyncStatus; _count: { events: number } } | null }[]
-  analytics: { status: 'not_configured' }
+  analytics: { status: 'not_configured' | 'enabled' }
 }
 export interface LiveWorkspaceResponse { organizations: OrganizationListItem[]; projects: LiveProject[] }
 export interface MemberActivityResponse {
   role: 'participant' | 'observer'; user: ApiUser
   rawActivity: { kind: CollectedEventResponse['kind']; count: number }[]
-  analytics: { status: 'not_configured' }
+  analytics: { status: 'not_configured' | 'enabled' }
 }
 
 export interface ProjectAccessResponse {
@@ -90,6 +90,18 @@ export interface ProjectAccessResponse {
 
 export interface EventFilters {
   kind?: CollectedEventResponse['kind']; author?: string; from?: string; to?: string
+}
+export interface AnalyticsResponse {
+  status: 'not_connected' | 'disconnected' | 'source_error' | 'loading' | 'pending' | 'ready' | 'error'
+  sourceStatus: RepositorySyncStatus | 'not_connected'; stale: boolean; computedAt: string | null
+  sourceVersion: number | null; engineVersion: string | null; manualAvailableAt: string | null
+  project: import('./analytics').ProjectContributionResult | null
+  weeks: { weekStartsOn: string; result: import('./analytics').WeeklyContributionResult; summary: import('./analytics').AnalyticsWeeklySummary }[]
+}
+export interface TeamAnalyticsOverview {
+  status: 'ready' | 'pending'; computedAt: string | null; gini: number | null; totalPoints: number | null
+  flags: import('./analytics').ContributionFlag[]
+  members: import('./analytics').ContributionMetrics[]
 }
 export type ProjectAuditAction = 'manager_added' | 'manager_removed' | 'member_role_changed' | 'member_removed' | 'member_joined'
   | 'invitation_created' | 'invitation_revoked' | 'repository_connected' | 'repository_reconnected' | 'repository_disconnected'

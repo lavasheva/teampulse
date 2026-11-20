@@ -7,7 +7,7 @@ import { actionCredit, periodEvents, type Credit, type PeriodEvent } from './eve
 import { contributionFlags } from './flags'
 import { asPeriod, dateStart, DAY, projectBounds } from './period'
 
-const version = '1.0.0'
+const version = '1.1.0'
 export { generateWeeklySummary, type SummaryProvider, type SummaryMessage } from './summary'
 export { createGigaChatProvider, createYandexGptProvider } from './providers'
 const categories: WorkKind[] = ['code', 'pullRequests', 'reviews', 'issues']
@@ -71,6 +71,9 @@ function calculate(input: ProjectAnalyticsInput, bounds: [number, number],
   const members: ContributionMetrics[] = perMember.map(({ userId, units, weighted, days }) => {
     const first = days[0]
     const last = days.at(-1)
+    const joined = input.memberJoinedOn?.[userId]
+    const memberStart = joined ? Math.max(start, Math.min(dateStart(joined), first === undefined ? end : first * DAY)) : start
+    const memberDays = period ? Math.max(0, Math.ceil(end / DAY) - utcDay(memberStart)) : 0
     return {
       userId,
       work: workValues(kind => units[kind] / 20),
@@ -78,7 +81,7 @@ function calculate(input: ProjectAnalyticsInput, bounds: [number, number],
       sharePercent: percent(weighted, weightedTotal),
       categoryShares: workValues(kind => percent(units[kind], teamUnits[kind])),
       activeDays: days.length,
-      activeDaysPercent: percent(days.length, observedDays),
+      activeDaysPercent: percent(days.length, joined ? memberDays : observedDays),
       averageGapDays: days.length > 1 ? (last! - first) / (days.length - 1) : null,
       lastActiveOn: last === undefined ? null : new Date(last * DAY).toISOString().slice(0, 10),
       ...changeCounts.get(userId)!,
@@ -104,6 +107,7 @@ function calculate(input: ProjectAnalyticsInput, bounds: [number, number],
     coverageStart, start, end, knownCredits: creditsByUser,
     latestUnknown: unknown.at(-1) ?? prior.findLast(row => row.userId === null),
     useWeekEnd: weekly && end === requestedEnd,
+    memberJoinedOn: input.memberJoinedOn,
   })
   return result
 }

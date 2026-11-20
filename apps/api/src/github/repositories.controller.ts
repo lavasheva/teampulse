@@ -6,6 +6,7 @@ import { WorkspaceService } from '../workspace/workspace.service'
 import { PrismaService } from '../prisma.service'
 import { GitHubAppClient } from './app.client'
 import { recordAudit } from '../workspace/audit'
+import { invalidateWeeks } from './event.store'
 
 class RepositoryInput {
   @IsOptional() @IsString() @Matches(/^[1-9][0-9]{0,14}$/) installationId?: string
@@ -37,6 +38,7 @@ export class RepositoriesController {
         connectionVersion: { increment: 1 }, syncError: 'USER_DISCONNECTED', syncRetryAt: null,
         syncLeaseToken: null, syncLeaseUntil: null, nextReconcileAt: null } })
       await recordAudit(tx, { projectId: team.projectId, actorId: req.user.id, action: 'repository_disconnected', teamId, targetId: repository.id, subject: repository.fullName })
+      await invalidateWeeks(tx, teamId, [], true)
     })
   }
 
@@ -63,6 +65,7 @@ export class RepositoriesController {
             syncLeaseToken: null, syncLeaseUntil: null, nextReconcileAt: null },
           select: { id: true, fullName: true, syncStatus: true } })
         await recordAudit(tx, { projectId: team.projectId, actorId: req.user.id, action: previous ? 'repository_reconnected' : 'repository_connected', teamId, targetId: repository.id, subject: repository.fullName })
+        await invalidateWeeks(tx, teamId, [], true)
         return repository
       })
     } catch (error) {

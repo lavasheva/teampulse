@@ -24,12 +24,15 @@ import { AnalyticsInputService } from './analytics/input.service'
 import { AccessService } from './workspace/access.service'
 import { AccessController } from './workspace/access.controller'
 import { ActivityController } from './workspace/activity.controller'
+import { AnalyticsService } from './analytics/analytics.service'
+import { AnalyticsController } from './analytics/analytics.controller'
+import { AnalyticsQueue } from './analytics/analytics.queue'
 
 @Module({
   imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }])],
-  controllers: [HealthController, AuthController, WorkspaceController, ClientController, WebhooksController, RepositoriesController, IdentitiesController, AccessController, ActivityController],
+  controllers: [HealthController, AuthController, WorkspaceController, ClientController, WebhooksController, RepositoriesController, IdentitiesController, AccessController, ActivityController, AnalyticsController],
   providers: [PrismaService, AuthService, GitHubClient, WorkspaceService, GitHubAppClient, DeliveryProcessor, EventsQueue,
-    EventStore, HistorySource, HistoryService, ClientService, AnalyticsInputService, AccessService,
+    EventStore, HistorySource, HistoryService, ClientService, AnalyticsInputService, AccessService, AnalyticsService, AnalyticsQueue,
     { provide: APP_GUARD, useClass: ThrottlerGuard }, { provide: APP_GUARD, useClass: SessionGuard }],
 })
 export class AppModule {}

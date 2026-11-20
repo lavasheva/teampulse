@@ -168,6 +168,9 @@ model Team {
   memberships    TeamMembership[]
   repository     Repository?
   recalculations RecalculationRequest[]
+  analyticsVersion Int                   @default(1)
+  analysis        TeamAnalysis?
+  snapshots       WeeklySnapshot[]
 
   @@unique([id, projectId])
   @@index([projectId])
@@ -306,7 +309,40 @@ model RecalculationRequest {
   team         Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
   weekStartsOn DateTime @db.Date
   version      Int      @default(1)
+  processedVersion Int  @default(0)
   requestedAt  DateTime @default(now())
+
+  @@unique([teamId, weekStartsOn])
+}
+
+model TeamAnalysis {
+  teamId           String   @id @db.Uuid
+  team             Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  sourceVersion    Int      @default(0)
+  requestedVersion Int      @default(0)
+  engineVersion    String?
+  result           Json?
+  computedAt       DateTime?
+  nextAt           DateTime @default(now())
+  manualAt         DateTime?
+  leaseToken       String?
+  leaseUntil       DateTime?
+  failures         Int      @default(0)
+  error            String?
+
+  @@index([nextAt])
+}
+
+model WeeklySnapshot {
+  id            String   @id @default(uuid()) @db.Uuid
+  teamId        String   @db.Uuid
+  team          Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  weekStartsOn  DateTime @db.Date
+  sourceVersion Int
+  engineVersion String
+  result        Json
+  summary       Json
+  computedAt    DateTime @default(now())
 
   @@unique([teamId, weekStartsOn])
 }

@@ -1,7 +1,7 @@
 import type { AuthSessionResponse, CollectedEventsResponse, CreateOrganizationInput, CreateProjectInput,
   CreatedInvitationResponse, CreatedProjectResponse, InvitationResponse, LiveProjectSettings, LiveWorkspaceResponse,
   MemberActivityResponse, OrganizationResponse, ProjectAccessResponse, RepositorySyncResponse, UnmatchedIdentitiesResponse } from '@teampulse/shared'
-import type { EventFilters, ProjectAuditResponse } from '@teampulse/shared'
+import type { AnalyticsResponse, CollectedEventResponse, EventFilters, ProjectAuditResponse } from '@teampulse/shared'
 
 export class ApiError extends Error {
   readonly status: number
@@ -34,6 +34,9 @@ export const api = {
   },
   async logout() { await request<void>('/auth/logout', 'POST'); csrf = undefined },
   workspace: () => request<LiveWorkspaceResponse>('/workspace'),
+  analytics: (teamId: string) => request<AnalyticsResponse>(`/teams/${id(teamId)}/analytics`),
+  refreshAnalytics: (teamId: string) => request(`/teams/${id(teamId)}/analytics/refresh`, 'POST'),
+  event: (teamId: string, eventId: string) => request<CollectedEventResponse>(`/teams/${id(teamId)}/activity/${id(eventId)}`),
   createOrganization: (input: CreateOrganizationInput) => request<OrganizationResponse>('/organizations', 'POST', input),
   createProject: (organizationId: string, input: CreateProjectInput) => request<CreatedProjectResponse>(`/organizations/${id(organizationId)}/projects`, 'POST', input),
   createTeam: (projectId: string, name: string) => request(`/projects/${id(projectId)}/teams`, 'POST', { name }),

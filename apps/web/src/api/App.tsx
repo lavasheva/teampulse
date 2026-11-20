@@ -9,6 +9,7 @@ import { WorkspaceFrame } from '../components/workspace-frame'
 import { CollectedTeamCard } from '../components/project-team-card'
 import { CollectedMembers } from '../components/contributions'
 import { auditLabels, eventLabels, roleLabel } from './labels'
+import { TeamAnalytics } from './analytics'
 
 function ErrorText({ error }: { error: unknown }) {
   return error ? <p role="alert" className="mt-3 text-sm">{error instanceof Error ? error.message : 'Не удалось выполнить запрос.'}</p> : null
@@ -49,7 +50,7 @@ function Login({ invitation = false, error }: { invitation?: boolean; error?: un
   return <div className="login-screen">
     <div className="login-intro"><Brand inverse /><div><h1>Активность команды —<br />из вашего GitHub</h1>
       <ul><li>✓ Проекты, команды и приглашения</li><li>✓ История коммитов, PR, ревью и задач</li><li>✓ Сопоставление авторов и доступ по ролям</li></ul>
-    </div><p>Расчёты вклада и ИИ-сводки — следующий этап</p></div>
+    </div><p>Вклад, регулярность и недельные сводки команды</p></div>
     <main className="login-main"><Card className="login-card"><h2>{invitation ? 'Приглашение в команду' : 'Вход в TeamPulse'}</h2>
       <p>{invitation ? 'Войдите через GitHub, чтобы выбрать команду.' : 'Войдите через GitHub, чтобы открыть свои проекты и команды.'}</p><LoginButton /><ErrorText error={error} />
       <div className="login-note"><p>Доступ определяется вашими правами в проекте.</p></div>
@@ -120,10 +121,9 @@ function Project() {
       { label: 'Команды', value: project.teams.length },
       { label: 'Участники', value: project.teams.reduce((sum, team) => sum + team.memberships.filter(member => member.role === 'participant').length, 0) },
       { label: 'Собрано событий', value: project.teams.reduce((sum, team) => sum + (team.repository?._count.events ?? 0), 0) },
-      { label: 'Равномерность вклада', value: '—' },
+      { label: 'Команды с расчётом', value: project.teams.filter(team => team.analytics?.status === 'ready').length },
     ].map(stat => <Card key={stat.label} className="p-4"><p className="text-xs muted">{stat.label}</p><strong className="block py-1 text-[27px]">{stat.value}</strong></Card>)}</div>
     <div className="grid gap-3 lg:grid-cols-2" aria-label="Команды проекта">{project.teams.map(team => <CollectedTeamCard key={team.id} projectId={project.id} team={team} />)}</div>
-    <Card className="mt-5 p-5"><h2>Вклад ещё не рассчитан</h2><p className="mt-2 text-sm muted">Собранные события доступны на странице команды. Доли вклада, флаги и сводки появятся после расчёта.</p></Card>
     {project.canManage && <>
       <Panel title="Добавить команду" className="mt-5"><form className="flex flex-wrap items-end gap-3" onSubmit={event => {
         event.preventDefault(); const form = event.currentTarget
@@ -146,10 +146,8 @@ function ProjectSection({ section }: { section: 'participants' | 'settings' | 's
       : section === 'participants' ? <div className="space-y-5">
         {project.teams.map(team => <section key={team.id}><h2 className="mb-3"><Link to={`/projects/${project.id}/teams/${team.id}`}>{team.name}</Link></h2><CollectedMembers projectId={project.id} team={team} /></section>)}
         {project.canManage && <Access project={project} />}
-      </div> : <EmptyState title={section === 'report' ? 'Отчёт ещё не сформирован' : 'Сводки ещё не рассчитаны'}>
-        <p className="my-3 muted">События GitHub уже доступны. Метрики вклада, флаги и текстовые сводки появятся после подключения аналитического модуля.</p>
-        <Link to={`/projects/${project.id}`}>Перейти к командам и событиям</Link>
-      </EmptyState>}
+      </div> : <div className="space-y-6">{project.teams.filter(team => !teamId || team.id === teamId).map(team =>
+        <TeamAnalytics key={team.id} project={project} team={team} summaries={section === 'summaries'} report={section === 'report'} />)}</div>}
   </>
 }
 function Audit({ project }: { project: LiveProject }) {
@@ -306,6 +304,7 @@ function Team() {
         <p className="text-sm muted">Сначала установите приложение на выбранный репозиторий. Подключение подтверждает его администратор.</p>
         <Button type="submit" disabled={connect.isPending}>{team.repository ? 'Подключить повторно' : 'Подключить репозиторий'}</Button><ErrorText error={connect.error} /></form>
     </Panel>}
+    {tab === 'overview' && <div className="mb-5"><TeamAnalytics project={project} team={team} /></div>}
     <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
       {tab === 'members' ? <CollectedMembers projectId={project.id} team={team} /> : <div className="space-y-5"><Panel title="События из GitHub">
         <form key={JSON.stringify(filters)} aria-label="Фильтры событий" className="mb-4 grid gap-3 sm:grid-cols-2" onSubmit={event => {
@@ -342,18 +341,21 @@ function Team() {
       </Panel></div>}
       <aside className="space-y-5"><Panel title="Участники">{team.memberships.map(member => <p key={member.user.id} className="mb-3 text-sm"><Link to={`/projects/${project.id}/teams/${team.id}/members/${member.user.id}`}>{member.user.name ?? member.user.githubLogin}</Link><br /><span className="muted">{member.role === 'observer' ? 'Наблюдатель' : 'Участник'}</span></p>)}
         {!team.memberships.length && <p className="muted">Пригласите участников в команду.</p>}
-      </Panel><Panel title="Вклад ещё не рассчитан"><p className="text-sm muted">Здесь пока показаны собранные события и статистика GitHub. Доли вклада, флаги и сводки появятся после расчёта.</p></Panel></aside>
+      </Panel></aside>
     </div>
   </>
 }
 function Member() {
   const { projectId, teamId = '', memberId = '' } = useParams()
+  const workspace = useLiveWorkspace()
   const member = useQuery({ queryKey: ['api', 'member', teamId, memberId], queryFn: () => api.member(teamId, memberId) })
   if (member.isPending) return <Loading />
   if (member.isError) return <ErrorText error={member.error} />
+  const project = workspace.data?.projects.find(project => project.id === projectId), team = project?.teams.find(team => team.id === teamId)
   return <><PageHeader title={member.data.user.name ?? member.data.user.githubLogin} eyebrow={<Link to={`/projects/${projectId}/teams/${teamId}`}>← Команда</Link>} />
+    {project && team && <div className="mb-5"><TeamAnalytics project={project} team={team} memberId={memberId} /></div>}
     <Panel title="Собранная активность">{member.data.rawActivity.map(item => <p key={item.kind}>{eventLabels[item.kind]}: {item.count}</p>)}
-      {!member.data.rawActivity.length && <p>Сопоставленных событий пока нет.</p>}<p className="mt-4 text-sm muted">Это число событий GitHub. Взвешенный вклад ещё не рассчитан.</p></Panel></>
+      {!member.data.rawActivity.length && <p>Сопоставленных событий пока нет.</p>}<p className="mt-4 text-sm muted">Число событий GitHub до применения весов и корректировок.</p></Panel></>
 }
 function Invitation() {
   const { code = '' } = useParams(), session = useSession(), navigate = useNavigate()

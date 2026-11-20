@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma.service'
 import { WorkspaceService } from './workspace.service'
 import { invalidateWeeks } from '../github/event.store'
 import { recordAudit } from './audit'
+import type { ProjectContributionResult } from '@teampulse/shared'
+import { analyticsEngine } from '@teampulse/analytics'
 
 const day = z.iso.date()
 const settingsSchema = z.object({
@@ -39,9 +41,10 @@ export class ClientService {
         organization: { select: { id: true, name: true, kind: true,
           memberships: { where: { userId, role: 'owner' }, select: { userId: true } } } },
         teams: { where: { OR: [{ project: manager }, { memberships: { some: { userId } } }] },
-          select: { id: true, name: true, memberships: { select: { role: true,
+          select: { id: true, name: true, analyticsVersion: true, analysis: { select: { sourceVersion: true, engineVersion: true, result: true, computedAt: true, nextAt: true, error: true } }, memberships: { select: { role: true,
             user: { select: { id: true, githubLogin: true, name: true, avatarUrl: true } } } },
-            repository: { select: { fullName: true, syncStatus: true, _count: { select: { events: true } } } } },
+            repository: { select: { fullName: true, syncStatus: true, _count: { select: { events: true,
+              deliveries: { where: { status: { in: ['pending', 'processing'] } } } } } } } },
           orderBy: { createdAt: 'asc' } },
       }, orderBy: { createdAt: 'desc' }, take: 100 })
     return { organizations: await this.workspace.organizations(userId), projects: projects.map(project => {
@@ -50,8 +53,16 @@ export class ClientService {
         canManage, settings: { name: project.name, startsOn: project.startsOn.toISOString().slice(0, 10),
           endsOn: project.endsOn.toISOString().slice(0, 10), weights: project.weights, thresholds: project.thresholds,
           milestones: project.milestones.map(point => ({ ...point, date: point.date.toISOString().slice(0, 10) })) },
-        teams: project.teams.map(team => ({ ...team, canConnect: canManage || team.memberships.some(member => member.user.id === userId && member.role === 'participant') })),
-        analytics: { status: 'not_configured' as const },
+        teams: project.teams.map(({ analysis, analyticsVersion, ...team }) => {
+          const ready = Boolean(analysis?.result && analysis.sourceVersion === analyticsVersion && analysis.engineVersion === analyticsEngine.version
+            && !analysis.error && analysis.nextAt > new Date() && team.repository?.syncStatus === 'complete' && team.repository._count.deliveries === 0)
+          const result = ready ? analysis!.result as unknown as ProjectContributionResult : null
+          return { ...team, repository: team.repository ? { ...team.repository, _count: { events: team.repository._count.events } } : null,
+            canConnect: canManage || team.memberships.some(member => member.user.id === userId && member.role === 'participant'),
+            analytics: { status: ready ? 'ready' as const : 'pending' as const, computedAt: analysis?.computedAt?.toISOString() ?? null,
+              gini: result?.gini ?? null, totalPoints: result?.totalPoints ?? null, flags: result?.flags ?? [], members: result?.members ?? [] } }
+        }),
+        analytics: { status: 'enabled' as const },
       }
     }) }
   }
@@ -73,7 +84,8 @@ export class ClientService {
         select: { occurredAt: true, repository: { select: { teamId: true } } } })
       const dates = new Map<string, Date[]>()
       for (const event of events) dates.set(event.repository.teamId, [...(dates.get(event.repository.teamId) ?? []), event.occurredAt])
-      for (const [teamId, weeks] of dates) await invalidateWeeks(tx, teamId, weeks)
+      const teams = await tx.team.findMany({ where: { projectId }, select: { id: true } })
+      for (const team of teams) await invalidateWeeks(tx, team.id, dates.get(team.id) ?? [], true)
       await recordAudit(tx, { projectId, actorId: userId, action: 'settings_updated' })
       return { ...value }
     }, { timeout: 30000 })
@@ -84,6 +96,6 @@ export class ClientService {
     const member = team.memberships.find(item => item.user.id === memberId)
     if (!member) throw new NotFoundException('Member not found')
     const activity = await this.prisma.event.groupBy({ by: ['kind'], where: { repository: { teamId }, author: { userId: memberId } }, _count: true })
-    return { ...member, rawActivity: activity.map(item => ({ kind: item.kind, count: item._count })), analytics: { status: 'not_configured' as const } }
+    return { ...member, rawActivity: activity.map(item => ({ kind: item.kind, count: item._count })), analytics: { status: 'enabled' as const } }
   }
 }

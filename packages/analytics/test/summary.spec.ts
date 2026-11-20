@@ -21,7 +21,7 @@ test('renders a stable Russian template and skips external providers on an empty
   const summary = await generateWeeklySummary(result, input.members, { name: 'mock', generate })
   expect(generate).not.toHaveBeenCalled()
   expect(summary).toMatchObject({ source: 'template', fallbackReason: 'empty', weekStartsOn: '2026-11-16',
-    engineVersion: '1.0.0', sourceVersion: 1, text: expect.stringContaining('события GitHub не зарегистрированы') })
+    engineVersion: '1.1.0', sourceVersion: 1, text: expect.stringContaining('события GitHub не зарегистрированы') })
   expect(await generateWeeklySummary(result, input.members)).toEqual(summary)
 })
 

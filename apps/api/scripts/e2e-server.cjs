@@ -20,6 +20,7 @@ async function start() {
   const { GitHubAppClient } = require('../dist/github/app.client')
   const { PrismaService } = require('../dist/prisma.service')
   const { DeliveryProcessor } = require('../dist/github/delivery.processor')
+  const { AnalyticsService } = require('../dist/analytics/analytics.service')
   const { configureApp } = require('../dist/setup')
   const { ForbiddenException } = require('@nestjs/common')
   const runId = randomUUID(), externalId = String(Date.now()), userIds = new Set()
@@ -67,6 +68,13 @@ async function start() {
       await prisma.repository.update({ where: { id: repository.id }, data: { syncStatus: 'complete', syncedAt: new Date() } })
       res.json({ accepted: true })
     } catch { res.status(500).json({ error: 'Test event failed' }) }
+  })
+  server.post('/__test/calculate', async (_req, res) => {
+    try {
+      const repository = await prisma.repository.findUniqueOrThrow({ where: { provider_externalId: { provider: 'github', externalId } } })
+      const result = await app.get(AnalyticsService).run(repository.teamId)
+      res.json({ calculated: result })
+    } catch { res.status(500).json({ error: 'Test calculation failed' }) }
   })
   async function cleanup() {
     const users = await prisma.user.findMany({ where: { githubId: { in: [teacherId, `e2e-student-${runId}`] } }, select: { id: true } })

@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Param, ParseUUIDPipe, Query, Req } from '@nestjs/common'
+import { BadRequestException, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Query, Req } from '@nestjs/common'
 import { EventKind, type Prisma } from '@prisma/client'
 import { z } from 'zod'
 import type { AuthRequest } from '../auth/security'
@@ -15,6 +15,16 @@ const size = 50
 @Controller()
 export class ActivityController {
   constructor(private readonly prisma: PrismaService, private readonly workspace: WorkspaceService) {}
+
+  @Get('teams/:teamId/activity/:eventId')
+  async event(@Req() req: AuthRequest, @Param('teamId', ParseUUIDPipe) teamId: string, @Param('eventId', ParseUUIDPipe) eventId: string) {
+    await this.workspace.team(req.user.id, teamId)
+    const event = await this.prisma.event.findFirst({ where: { id: eventId, repository: { teamId } },
+      select: { id: true, kind: true, occurredAt: true, payload: true, details: true,
+        author: { select: { id: true, userId: true, login: true, resolution: true } } } })
+    if (!event) throw new NotFoundException('Event not found')
+    return event
+  }
 
   @Get('teams/:teamId/activity')
   async feed(@Req() req: AuthRequest, @Param('teamId', ParseUUIDPipe) teamId: string, @Query() query: unknown) {

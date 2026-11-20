@@ -13,6 +13,8 @@ export interface ProjectAnalyticsInput {
   events: AnalyticsEvent[]
   /** Exclusive observation cutoff for an in-progress report. Omit for a completed period. */
   asOf?: string
+  /** UTC membership dates, used to avoid inactivity before joining. Prior work still counts. */
+  memberJoinedOn?: Record<string, string>
 }
 
 /** UTC weeks start on Monday. */

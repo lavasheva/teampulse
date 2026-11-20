@@ -1,17 +1,16 @@
-import type { Team } from '@teampulse/shared'
 import { Bar, BarChart, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Panel } from './ui'
 
-type ActivityData = Pick<Team, 'weeks' | 'members'>
+type ActivityData = { members: { id: string; name: string; color: string }[]; weeks: { label: string; values: Record<string, number> }[]; title?: string; allowDecimals?: boolean }
 
-export function ActivityChart({ members, weeks }: ActivityData) {
-  return <Panel title="Активность по неделям">
+export function ActivityChart({ members, weeks, title = 'Активность по неделям', allowDecimals = false }: ActivityData) {
+  return <Panel title={title}>
     {weeks.length ? <>
       <div className="h-64 min-w-0" data-testid="weekly-chart">
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <BarChart data={weeks} accessibilityLayer margin={{ left: 0, right: 12, top: 4 }}>
             <XAxis dataKey="label" fontSize={12} tickLine={false} axisLine={{ stroke: '#e6e8ef' }} />
-            <YAxis allowDecimals={false} fontSize={12} tickLine={false} axisLine={false} width={32} />
+            <YAxis allowDecimals={allowDecimals} fontSize={12} tickLine={false} axisLine={false} width={40} />
             <Tooltip />
             <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: 12 }} />
             {members.map(member => <Bar key={member.id} name={member.name} dataKey={week => week.values[member.id] ?? 0} fill={member.color} stackId="activity" maxBarSize={42} isAnimationActive={false} />)}

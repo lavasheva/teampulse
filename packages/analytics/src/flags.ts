@@ -11,6 +11,7 @@ interface FlagContext {
   knownCredits: Map<string, Credit[]>
   latestUnknown: PeriodEvent | undefined
   useWeekEnd: boolean
+  memberJoinedOn?: Record<string, string>
 }
 
 const weighted = (credit: Credit, weights: WorkValues) => credit.units * weights[credit.category]
@@ -62,7 +63,8 @@ export function contributionFlags(
     const { userId } = member
     const credits = knownCredits.get(userId) ?? []
     const last = credits.at(-1)
-    const memberSilenceStart = last ? fullDayStart(last.timestamp) + DAY : coverageStart
+    const joined = context.memberJoinedOn?.[userId]
+    const memberSilenceStart = Math.max(last ? fullDayStart(last.timestamp) + DAY : coverageStart, joined ? dateStart(joined) : coverageStart)
     const inactiveDays = (observedEnd - memberSilenceStart) / DAY
     if (inactiveDays >= thresholds.inactivity && teammate && teammate.timestamp >= memberSilenceStart) {
       add({ kind: 'inactivity', userId, severity: 'warning', actual: inactiveDays, threshold: thresholds.inactivity, unit: 'days',

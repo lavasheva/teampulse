@@ -62,7 +62,7 @@ describe('client workspace and settings API', () => {
     expect(member.projects).toHaveLength(1)
     expect(member.projects[0].teams.map((team: { id: string }) => team.id)).toEqual([teamId])
     expect(member.projects[0].canManage).toBe(false); expect(member.projects[0].teams[0].canConnect).toBe(true)
-    expect(member.projects[0].analytics.status).toBe('not_configured')
+    expect(member.projects[0].analytics.status).toBe('enabled')
     const observer = (await api().get('/api/workspace').set(headers('observer')).expect(200)).body
     expect(observer.projects[0].teams[0].canConnect).toBe(false)
     const manager = (await api().get('/api/workspace').set(headers('manager')).expect(200)).body
@@ -104,7 +104,7 @@ describe('client workspace and settings API', () => {
 
   it('returns real member event counts without claiming they are calculated contribution', async () => {
     const result = (await api().get(`/api/teams/${teamId}/members/${accounts.member.id}`).set(headers('observer')).expect(200)).body
-    expect(result.rawActivity).toEqual([{ kind: 'commit', count: 2 }]); expect(result.analytics.status).toBe('not_configured')
+    expect(result.rawActivity).toEqual([{ kind: 'commit', count: 2 }]); expect(result.analytics.status).toBe('enabled')
     expect(result.user).not.toHaveProperty('email')
     await api().get(`/api/teams/${teamId}/members/${accounts.member.id}`).set(headers('stranger')).expect(404)
     await api().get(`/api/teams/${otherTeamId}/members/${accounts.member.id}`).set(headers('member')).expect(404)

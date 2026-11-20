@@ -9,7 +9,8 @@ export function weekStart(date: Date) {
   return day
 }
 
-export async function invalidateWeeks(tx: Prisma.TransactionClient, teamId: string, dates: Date[]) {
+export async function invalidateWeeks(tx: Prisma.TransactionClient, teamId: string, dates: Date[], force = false) {
+  if (dates.length || force) await tx.team.update({ where: { id: teamId }, data: { analyticsVersion: { increment: 1 } } })
   const weeks = new Map(dates.map(date => { const week = weekStart(date); return [week.toISOString(), week] }))
   for (const weekStartsOn of weeks.values()) await tx.recalculationRequest.upsert({
     where: { teamId_weekStartsOn: { teamId, weekStartsOn } },

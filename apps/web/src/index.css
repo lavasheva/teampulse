@@ -146,6 +146,15 @@
 @page { size: A4; margin: 12mm; }
 
 @media print {
+  .workspace:has(.api-analytics-report) { display: block; }
+  .workspace:has(.api-analytics-report) .sidebar,
+  .workspace:has(.api-analytics-report) button,
+  .workspace:has(.api-analytics-report) .eyebrow { display: none; }
+  .workspace:has(.api-analytics-report) .workspace-content { margin: 0; padding: 0; max-width: none; width: auto; }
+  .api-analytics-report .table-scroll { overflow: visible; }
+  .api-analytics-report table { min-width: 0 !important; font-size: 10px; }
+  .api-analytics-report h2 { break-after: avoid; }
+  .api-analytics-report article, .api-analytics-report tr { break-inside: avoid; }
   body, .report-screen { background: white; color: black; }
   .report-screen, .report-sheet { min-height: 0; max-width: none; padding: 0; }
   .report-toolbar { display: none; }

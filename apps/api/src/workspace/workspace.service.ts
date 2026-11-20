@@ -123,7 +123,7 @@ export class WorkspaceService {
           const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { githubLogin: true } })
           await recordAudit(tx, { projectId: invitation.projectId, actorId: userId, action: 'member_joined', teamId, targetId: userId, subject: user.githubLogin, afterRole: invitation.role })
           const events = await tx.event.findMany({ where: { repository: { teamId } }, select: { occurredAt: true } })
-          await invalidateWeeks(tx, teamId, events.map(event => event.occurredAt))
+          await invalidateWeeks(tx, teamId, events.map(event => event.occurredAt), true)
         }
         // Resolve old authors asynchronously on the next scan, without slowing down joining a large team.
         if (!existing) await tx.repository.updateMany({ where: { teamId, syncStatus: 'complete' },

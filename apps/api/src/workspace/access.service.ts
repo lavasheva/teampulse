@@ -71,7 +71,7 @@ export class AccessService {
       await recordAudit(tx, { projectId, actorId: userId, action: role ? 'member_role_changed' : 'member_removed', teamId, targetId,
         subject: target?.githubLogin, beforeRole: member.role, ...(role ? { afterRole: role } : {}) })
       const events = await tx.event.findMany({ where: { repository: { teamId } }, select: { occurredAt: true } })
-      await invalidateWeeks(tx, teamId, events.map(event => event.occurredAt))
+      await invalidateWeeks(tx, teamId, events.map(event => event.occurredAt), true)
       // Keep immutable history and attribution; analytics considers only current participants.
       if (role === 'participant') await tx.repository.updateMany({ where: { teamId, syncStatus: 'complete' },
         data: { syncStatus: 'pending', syncCursor: null, syncProcessed: 0, syncRetryAt: null, syncError: null } })

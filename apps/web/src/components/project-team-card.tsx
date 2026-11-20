@@ -7,10 +7,16 @@ import { Badge, Card } from './ui'
 export function CollectedTeamCard({ projectId, team }: { projectId: string; team: LiveProject['teams'][number] }) {
   return <Link aria-label={team.name} className="block text-ink no-underline hover:no-underline" to={paths.team(projectId, team.id)}>
     <Card className="team-card h-full">
-      <div className="flex flex-wrap justify-between gap-2"><h2>{team.name}</h2><Badge>Ожидает расчёта</Badge></div>
+      <div className="flex flex-wrap justify-between gap-2"><h2>{team.name}</h2><Badge>{team.analytics?.status === 'ready' ? 'Расчёт готов' : 'Ожидает расчёта'}</Badge></div>
       <p className="mb-3 break-words text-xs muted">{team.repository?.fullName ?? 'Репозиторий не подключён'}</p>
       <p className="text-sm">Участников: {team.memberships.filter(member => member.role === 'participant').length}</p>
       <p className="text-sm muted">Наблюдателей: {team.memberships.filter(member => member.role === 'observer').length}</p>
+      {team.analytics?.status === 'ready' && <div className="my-3 space-y-1 text-sm">
+        <p>Баллы: {formatNumber(team.analytics.totalPoints ?? 0)} · Джини: {formatNumber(team.analytics.gini ?? 0)}</p>
+        <p>Флагов: {team.analytics.flags.length}</p>
+        {team.analytics.members.map(member => <p key={member.userId}>{team.memberships.find(item => item.user.id === member.userId)?.user.githubLogin}: {formatNumber(member.sharePercent)}%</p>)}
+        {team.analytics.totalPoints === 0 && <p className="muted">Измеренного вклада нет.</p>}
+      </div>}
       <div className="mt-3 border-t border-line pt-2 text-xs muted">Собрано событий: {team.repository?._count.events ?? 0}</div>
     </Card>
   </Link>
